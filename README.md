@@ -91,7 +91,8 @@ pipeline and dashboard._
 
 ## Team
 
-- **Aadi Prabhu** ([@AadiSPrabs](https://github.com/AadiSPrabs)) — representative
+- **Representative:** _to be confirmed_
+- **Aadi Prabhu** ([@AadiSPrabs](https://github.com/AadiSPrabs))
 - **Teammate** — _to be added: name and GitHub handle of the second accepted
   participant before submission. Only accepted hackathon participants are
   listed as team members._
