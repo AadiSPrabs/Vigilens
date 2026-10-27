@@ -147,11 +147,26 @@ function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <h1>Vigilens</h1>
-        <Banner fromFixture={showFixtureBanner} fixtureNotice={audit?.fixture_notice} />
-        <span className="mode-badge">Mode: {isFixtureMode ? 'fixture' : 'backend'}</span>
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true" />
+          <h1>Vigilens</h1>
+        </div>
+        <div className="topbar-actions">
+          <Banner fromFixture={showFixtureBanner} fixtureNotice={audit?.fixture_notice} />
+          <span className="mode-badge">{isFixtureMode ? 'Fixture mode' : 'Backend'}</span>
+          {audit && !loading && (
+            <button
+              type="button"
+              className="btn btn-ghost topbar-action"
+              onClick={handlePrint}
+              aria-label="Export audit report"
+            >
+              Export PDF
+            </button>
+          )}
+        </div>
       </header>
-      {healthBanner && <div className="banner banner-health" style={{ background: '#f87171', color: '#7f1d1d' }}>{healthBanner}</div>}
+      {healthBanner && <div className="banner banner-health">{healthBanner}</div>}
       <div aria-live="polite" aria-atomic="true" className="sr-only">{announce}</div>
 
       {audit && !loading && (
@@ -167,35 +182,43 @@ function App() {
       <main className="main">
         <section className="workspace" aria-label="Image workspace">
           {showAuditImage && (
-            <AuditImage 
-              audit={audit}
-              selectedId={selectedId}
-              onSelectPerson={setSelectedId}
-              uploadedNaturalSize={uploadedNaturalSize}
-            />
+            <div className="canvas-stage">
+              <AuditImage
+                audit={audit}
+                selectedId={selectedId}
+                onSelectPerson={setSelectedId}
+                uploadedNaturalSize={uploadedNaturalSize}
+              />
+            </div>
           )}
-          <UploadZoneEditor
-            image={image}
-            setImage={setImage}
-            zones={zones}
-            setZones={setZones}
-            sample={sample}
-            setSample={setSample}
-            runWithoutZones={runWithoutZones}
-            setRunWithoutZones={setRunWithoutZones}
-            onAnalyse={handleAnalyse}
-            loading={loading}
-          />
+          <div className="editor-stage">
+            <UploadZoneEditor
+              image={image}
+              setImage={setImage}
+              zones={zones}
+              setZones={setZones}
+              sample={sample}
+              setSample={setSample}
+              runWithoutZones={runWithoutZones}
+              setRunWithoutZones={setRunWithoutZones}
+              onAnalyse={handleAnalyse}
+              loading={loading}
+            />
+          </div>
         </section>
 
         <aside className="inspector" aria-label="Inspector">
           <div className="inspector-header">
             <div className="inspector-heading">
-              <h2 className="inspector-title">Inspector</h2>
-              {audit && !loading && (
-                <p className="inspector-summary">
-                  {totalFindings} findings <span className="summary-dot" aria-hidden="true">·</span> {criticalFindings} Critical
-                </p>
+              <span className="inspector-kicker">Audit Summary</span>
+              {audit && !loading ? (
+                <div className="inspector-summary">
+                  <span>{totalFindings} findings</span>
+                  <span className="summary-sep" aria-hidden="true">·</span>
+                  <span>{criticalFindings} Critical</span>
+                </div>
+              ) : (
+                <span className="inspector-summary muted">No audit loaded</span>
               )}
               {evidenceUnavailable && !loading && (
                 <span className="evidence-pill">Masked evidence unavailable</span>

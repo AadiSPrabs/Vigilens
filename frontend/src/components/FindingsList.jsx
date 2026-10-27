@@ -139,7 +139,7 @@ export default function FindingsList({ audit, selectedId, onSelectPerson, decisi
       <div className="card findings-card">
         {showHeader && <h2>Findings ({allFindings.length})</h2>}
       <p className="findings-summary">
-        {violationCount} findings - {criticalCount} Critical - {needsReviewCount} Needs Human Review
+        {violationCount} findings <span aria-hidden="true">·</span> {criticalCount} Critical <span aria-hidden="true">·</span> {needsReviewCount} Needs review
       </p>
       <div className="findings-filters">
         <select value={filters?.severity || 'all'} onChange={(e) => setFilters && setFilters({...filters, severity: e.target.value})}>
@@ -164,65 +164,37 @@ export default function FindingsList({ audit, selectedId, onSelectPerson, decisi
           const currentReview = decisions?.[key] || defaultReview
           
           return (
-            <div 
-              key={key}
-              style={{ 
-                border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)',
-                padding: '0.75rem',
-                marginBottom: '0.75rem',
-                borderRadius: '4px',
-                background: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg)'
-              }}
-            >
+            <div key={key} className={`finding-row ${isSelected ? 'selected' : ''}`}>
               <button
+                type="button"
                 onClick={() => onSelectPerson(person.id)}
-                style={{
-                  width: '100%',
-                  textAlign: 'left',
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text)',
-                  cursor: 'pointer',
-                  padding: 0,
-                  fontSize: '1rem',
-                  fontWeight: '600'
-                }}
+                className="finding-person"
                 aria-label={`Select Person ${pIdx + 1}`}
               >
-                Person {pIdx + 1} • {zoneName}
+                <span>Person {pIdx + 1}</span>
+                <span className="finding-zone">{zoneName}</span>
               </button>
               
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.875rem' }}>Hard hat: <strong>{getPPELabel(person.helmet)}</strong></span>
-                <span style={{ fontSize: '0.875rem' }}>Vest: <strong>{getPPELabel(person.vest)}</strong></span>
+              <div className="finding-ppe">
+                <span>Hard hat: <strong>{getPPELabel(person.helmet)}</strong></span>
+                <span>Vest: <strong>{getPPELabel(person.vest)}</strong></span>
               </div>
               
-              <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="finding-meta">
                 {isUncertainty ? (
-                  <span 
-                    style={{ 
-                      color: '#92400e', 
-                      background: '#fef3c7', 
-                      padding: '0.25rem 0.5rem', 
-                      borderRadius: '4px',
-                      fontSize: '0.875rem',
-                      fontWeight: '600'
-                    }}
-                  >
-                    Uncertain - needs human check
-                  </span>
+                  <span className="uncertainty-badge" title="Needs human check">Uncertain</span>
                 ) : (
                   <SeverityBadge severity={finding.severity} />
                 )}
-                <code style={{ fontSize: '0.75rem', background: 'var(--panel)', padding: '0.25rem' }}>{finding.rule_id}</code>
+                <code className="rule-id">{finding.rule_id}</code>
               </div>
               
-              <p style={{ margin: '0.5rem 0', fontSize: '0.9rem' }}>{finding.message}</p>
+              <p className="finding-message">{finding.message}</p>
               
-              <fieldset className="review" style={{ border: '1px solid var(--border)', padding: '0.5rem', marginTop: '0.5rem' }}>
+              <fieldset className="review">
                 <legend className="sr-only">Review decision for {finding.rule_id}</legend>
                 {['unreviewed', 'reviewed', 'needs_human_review'].map(v => (
-                  <label key={v} style={{ marginRight: '0.5rem', fontSize: '0.875rem' }}>
+                  <label key={v}>
                     <input 
                       type="radio" 
                       name={`review-${key}`} 
@@ -230,22 +202,22 @@ export default function FindingsList({ audit, selectedId, onSelectPerson, decisi
                       checked={currentReview === v} 
                       onChange={() => setDecisions && setDecisions({...decisions, [key]: v})} 
                     />
-                    {v === 'needs_human_review' ? 'Needs human review' : v === 'reviewed' ? 'Reviewed' : 'Unreviewed'}
+                    <span>{v === 'needs_human_review' ? 'Needs review' : v === 'reviewed' ? 'Reviewed' : 'Unreviewed'}</span>
                   </label>
                 ))}
               </fieldset>
               
               {finding.recheck_trace && finding.recheck_trace.length > 0 && (
-                <div>
+                <div className="finding-recheck">
                   <button
+                    type="button"
                     onClick={() => toggleExpand(key)}
-                    className="btn btn-secondary"
-                    style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem' }}
+                    className="btn btn-ghost recheck-btn"
                   >
                     {expanded[key] ? 'Hide' : 'Show'} {isIllustrative ? 'Illustrative (fixture), not a real re-check' : 'How was this checked?'}
                   </button>
                   {expanded[key] && (
-                    <ul style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
+                    <ul>
                       {finding.recheck_trace.map((trace, i) => (
                         <li key={i}>{trace}</li>
                       ))}

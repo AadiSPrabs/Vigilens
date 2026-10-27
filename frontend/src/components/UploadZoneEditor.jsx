@@ -224,8 +224,11 @@ export default function UploadZoneEditor({
   const displaySamples = isBackendMode ? [...samples, contractSample] : samples
 
   return (
-    <div className="card">
-      <h2>Upload & Zone Editor</h2>
+    <div className="upload-zone-editor">
+      <div className="editor-header">
+        <h2>Upload & Zone Editor</h2>
+        <span className="panel-hint">Zones are operator-drawn</span>
+      </div>
       
       <div className="sample-picker">
         <span>Try a sample:</span>
@@ -253,12 +256,12 @@ export default function UploadZoneEditor({
           onChange={(e) => handleFile(e.target.files[0])}
         />
         <p><small>jpg, png, webp • Max 15 MB</small></p>
-        {fileError && <p style={{ color: 'var(--critical)' }}>{fileError}</p>}
+        {fileError && <p className="field-error">{fileError}</p>}
       </div>
 
       {image && (
         <div className="zone-editor">
-          <p style={{ fontSize: '0.8rem', color: 'var(--medium)' }}>Preview only, not evidence</p>
+          <p className="canvas-note">Preview only, not evidence</p>
           <div className="canvas-frame">
             <div className="zone-canvas-wrapper">
               <img 
@@ -347,23 +350,23 @@ export default function UploadZoneEditor({
           </div>
 
           {keyboardMode && drawing && (
-            <div className="card" style={{ marginTop: '0.5rem' }}>
+            <div className="keyboard-panel">
               <button className="btn" onClick={handleKeyboardAddPoint}>Add point at centre</button>
-              <div style={{ marginTop: '0.5rem' }}>
+              <div className="nudge-controls">
                 <button onClick={() => handleKeyboardNudge(0, -0.01)} aria-label="Nudge up">↑</button>
                 <button onClick={() => handleKeyboardNudge(0, 0.01)} aria-label="Nudge down">↓</button>
                 <button onClick={() => handleKeyboardNudge(-0.01, 0)} aria-label="Nudge left">←</button>
                 <button onClick={() => handleKeyboardNudge(0.01, 0)} aria-label="Nudge right">→</button>
               </div>
-              <p><small>Use arrow keys to nudge, add point at centre</small></p>
+              <p className="panel-hint">Use arrow keys to nudge, add point at centre</p>
             </div>
           )}
 
-          {zoneError && <p style={{ color: 'var(--critical)' }}>{zoneError}</p>}
+          {zoneError && <p className="field-error">{zoneError}</p>}
 
           {drawing && (
-            <div className="card" style={{marginTop: '0.5rem'}}>
-              <div style={{display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap'}}>
+            <div className="zone-draw-panel">
+              <div className="draw-panel-row">
                 <input 
                   type="text" 
                   value={zoneName} 
@@ -371,7 +374,7 @@ export default function UploadZoneEditor({
                   placeholder="Zone name (required)"
                   maxLength={200}
                 />
-                <label>
+                <label className="checkbox-row">
                   <input 
                     type="checkbox" 
                     checked={zoneHazard} 
@@ -380,7 +383,7 @@ export default function UploadZoneEditor({
                   Hazard zone
                 </label>
               </div>
-              <p><small>Click on the image to add points. Need at least 3 points.</small></p>
+              <p className="panel-hint">Click on the image to add points. Need at least 3 points.</p>
             </div>
           )}
 
@@ -394,7 +397,7 @@ export default function UploadZoneEditor({
                   onChange={(e) => updateZone(zone.id, { name: e.target.value })}
                   maxLength={200}
                 />
-                <label>
+                <label className="checkbox-row">
                   <input 
                     type="checkbox" 
                     checked={zone.hazard}
@@ -407,7 +410,7 @@ export default function UploadZoneEditor({
             ))}
           </div>
 
-          <label style={{display: 'block', marginTop: '0.5rem'}}>
+          <label className="checkbox-row run-without-zones">
             <input 
               type="checkbox" 
               checked={runWithoutZones}
@@ -423,9 +426,8 @@ export default function UploadZoneEditor({
             </div>
           )}
 
-          <button 
-            className="btn" 
-            style={{marginTop: '1rem'}}
+          <button
+            className="btn analyse-btn"
             disabled={!canRun}
             onClick={onAnalyse}
           >
