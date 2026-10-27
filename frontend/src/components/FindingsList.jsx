@@ -25,16 +25,14 @@ function getZoneLabel(audit, person, finding) {
       return 'No zones were checked'
     }
     if (Array.isArray(zoneIds) && zoneIds.length > 0) {
-      // find names
       const names = zoneIds.map(zid => audit.zones?.find(z => z.id === zid)?.name).filter(Boolean)
       if (names.length > 0) return names.join(', ')
     }
   }
-  // field missing
   return 'No zone shown'
 }
 
-export default function FindingsList({ audit, selectedId, onSelectPerson }) {
+export default function FindingsList({ audit, selectedId, onSelectPerson, decisions, setDecisions, filters, setFilters }) {
   const [expanded, setExpanded] = useState({})
   
   const toggleExpand = (key) => {
@@ -74,6 +72,33 @@ export default function FindingsList({ audit, selectedId, onSelectPerson }) {
     })
   })
   
+  // Filters
+  let filteredFindings = allFindings.filter(({ person, finding }) => {
+    if (filters?.severity && filters.severity !== 'all') {
+      if (filters.severity === 'uncertain') {
+        if (finding.kind !== 'uncertainty') return false
+      } else {
+        if (finding.kind === 'uncertainty') return false
+        if (finding.severity !== filters.severity) return false
+      }
+    }
+    if (filters?.zone && filters.zone !== 'all') {
+      const zoneId = finding.zone_id !== undefined ? finding.zone_id : person.zone_id
+      const zone = audit.zones?.find(z => z.id === zoneId)
+      if ((zone?.name || 'No zone shown') !== filters.zone) return false
+    }
+    return true
+  })
+  
+  // Summary
+  const violationCount = allFindings.filter(f => f.finding.kind !== 'uncertainty').length
+  const criticalCount = allFindings.filter(f => f.finding.severity === 'Critical' && f.finding.kind !== 'uncertainty').length
+  const needsReviewCount = allFindings.filter(f => {
+    const k = f.finding.id || `${f.person.id}:${f.finding.rule_id}:${f.fIdx}`
+    const d = decisions?.[k] || (f.finding.review_state === 'needs_human_review' ? 'needs_human_review' : 'unreviewed')
+    return d === 'needs_human_review'
+  }).length
+  
   if (allFindings.length === 0) {
     return (
       <div className="card">
@@ -83,15 +108,39 @@ export default function FindingsList({ audit, selectedId, onSelectPerson }) {
     )
   }
   
+  const zones = [...new Set(allFindings.map(({ person, finding }) => {
+    const zoneId = finding.zone_id !== undefined ? finding.zone_id : person.zone_id
+    const zone = audit.zones?.find(z => z.id === zoneId)
+    return zone?.name || 'No zone shown'
+  }))]
+  
   return (
     <div className="card">
       <h2>Findings ({allFindings.length})</h2>
+      <p style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+        {violationCount} findings - {criticalCount} Critical - {needsReviewCount} Needs Human Review
+      </p>
+      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+        <select value={filters?.severity || 'all'} onChange={(e) => setFilters && setFilters({...filters, severity: e.target.value})}>
+          <option value="all">All Severities</option>
+          <option value="Critical">Critical</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+          <option value="uncertain">Uncertain</option>
+        </select>
+        <select value={filters?.zone || 'all'} onChange={(e) => setFilters && setFilters({...filters, zone: e.target.value})}>
+          <option value="all">All Zones</option>
+          {zones.map(z => <option key={z} value={z}>{z}</option>)}
+        </select>
+      </div>
       <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
-        {allFindings.map(({ person, finding, pIdx, key }) => {
+        {filteredFindings.map(({ person, finding, pIdx, fIdx, key }) => {
           const zoneName = getZoneLabel(audit, person, finding)
           const isSelected = selectedId === person.id
           const isUncertainty = finding.kind === 'uncertainty'
           const isIllustrative = audit.trace_provenance === 'illustrative_fixture_only'
+          const defaultReview = finding.review_state === 'needs_human_review' ? 'needs_human_review' : 'unreviewed'
+          const currentReview = decisions?.[key] || defaultReview
           
           return (
             <div 
@@ -148,6 +197,22 @@ export default function FindingsList({ audit, selectedId, onSelectPerson }) {
               </div>
               
               <p style={{ margin: '0.5rem 0', fontSize: '0.9rem' }}>{finding.message}</p>
+              
+              <fieldset className="review" style={{ border: '1px solid var(--border)', padding: '0.5rem', marginTop: '0.5rem' }}>
+                <legend className="sr-only">Review decision for {finding.rule_id}</legend>
+                {['unreviewed', 'reviewed', 'needs_human_review'].map(v => (
+                  <label key={v} style={{ marginRight: '0.5rem', fontSize: '0.875rem' }}>
+                    <input 
+                      type="radio" 
+                      name={`review-${key}`} 
+                      value={v}
+                      checked={currentReview === v} 
+                      onChange={() => setDecisions && setDecisions({...decisions, [key]: v})} 
+                    />
+                    {v === 'needs_human_review' ? 'Needs human review' : v === 'reviewed' ? 'Reviewed' : 'Unreviewed'}
+                  </label>
+                ))}
+              </fieldset>
               
               {finding.recheck_trace && finding.recheck_trace.length > 0 && (
                 <div>

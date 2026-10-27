@@ -23,6 +23,8 @@ export default function UploadZoneEditor({
   const [zoneError, setZoneError] = useState(null)
   const lastPointRef = useRef(null)
   const isBackendMode = (import.meta.env.VITE_AUDIT_MODE || 'fixture') === 'backend'
+  const [keyboardMode, setKeyboardMode] = useState(false)
+  const [centerPoint, setCenterPoint] = useState({ x: 0.5, y: 0.5 })
 
   useEffect(() => {
     if (zones && zones.length > 0 && runWithoutZones) {
@@ -76,7 +78,6 @@ export default function UploadZoneEditor({
     fetch(s.imageSrc)
       .then(r => r.blob())
       .then(blob => {
-        // Use original bytes with explicit correct type
         const type = s.id === 'contract-test' ? 'image/png' : (blob.type || 'image/png')
         const file = new File([blob], s.id + '.png', { type })
         setImage(file)
@@ -86,18 +87,36 @@ export default function UploadZoneEditor({
       })
   }
 
-  const handleImageClick = (e) => {
-    if (!drawing || !imgRef.current) return
-    const norm = clientToNormalised(e, imgRef.current)
-    if (!norm) return
+  const addPoint = (norm) => {
+    if (!drawing) return
     if (lastPointRef.current) {
       const dx = norm.x - lastPointRef.current.x
       const dy = norm.y - lastPointRef.current.y
       if (Math.sqrt(dx*dx + dy*dy) < 0.002) return
     }
     if (currentPoints.some(p => Math.abs(p.x-norm.x)<1e-9 && Math.abs(p.y-norm.y)<1e-9)) return
+    if (norm.x < 0 || norm.x > 1 || norm.y < 0 || norm.y > 1) return
     lastPointRef.current = norm
     setCurrentPoints([...currentPoints, norm])
+  }
+
+  const handleImageClick = (e) => {
+    if (!drawing || !imgRef.current) return
+    const norm = clientToNormalised(e, imgRef.current)
+    if (!norm) return
+    addPoint(norm)
+  }
+
+  const handleKeyboardAddPoint = () => {
+    if (!drawing) setDrawing(true)
+    addPoint(centerPoint)
+  }
+
+  const handleKeyboardNudge = (dx, dy) => {
+    setCenterPoint(prev => ({
+      x: Math.max(0, Math.min(1, prev.x + dx)),
+      y: Math.max(0, Math.min(1, prev.y + dy))
+    }))
   }
 
   const finishZone = () => {
@@ -150,6 +169,7 @@ export default function UploadZoneEditor({
     setZones(newZones)
     setCurrentPoints([])
     setDrawing(false)
+    setKeyboardMode(false)
     lastPointRef.current = null
     setZoneIdCounter(zoneIdCounter + 1)
     setZoneName(`Zone ${zoneIdCounter + 1}`)
@@ -274,11 +294,14 @@ export default function UploadZoneEditor({
                   ))}
                 </g>
               )}
+              {keyboardMode && drawing && (
+                <circle cx={centerPoint.x} cy={centerPoint.y} r="0.004" fill="#fbbf24" stroke="#000" strokeWidth="0.001" />
+              )}
             </svg>
           </div>
 
           <div className="controls">
-            <button className="btn btn-secondary" onClick={() => { setDrawing(!drawing); setCurrentPoints([]); lastPointRef.current = null; setZoneError(null) }}>
+            <button className="btn btn-secondary" onClick={() => { setDrawing(!drawing); setCurrentPoints([]); lastPointRef.current = null; setZoneError(null); setKeyboardMode(false) }}>
               {drawing ? 'Cancel Drawing' : 'Draw Zone'}
             </button>
             {drawing && (
@@ -286,9 +309,25 @@ export default function UploadZoneEditor({
                 <button className="btn btn-secondary" onClick={undoPoint}>Undo Last Point</button>
                 <button className="btn btn-secondary" onClick={clearPoints}>Clear Points</button>
                 <button className="btn" onClick={finishZone}>Finish Zone</button>
+                <button className="btn btn-secondary" onClick={() => setKeyboardMode(!keyboardMode)}>
+                  {keyboardMode ? 'Mouse Mode' : 'Keyboard Mode'}
+                </button>
               </>
             )}
           </div>
+
+          {keyboardMode && drawing && (
+            <div className="card" style={{ marginTop: '0.5rem' }}>
+              <button className="btn" onClick={handleKeyboardAddPoint}>Add point at centre</button>
+              <div style={{ marginTop: '0.5rem' }}>
+                <button onClick={() => handleKeyboardNudge(0, -0.01)} aria-label="Nudge up">↑</button>
+                <button onClick={() => handleKeyboardNudge(0, 0.01)} aria-label="Nudge down">↓</button>
+                <button onClick={() => handleKeyboardNudge(-0.01, 0)} aria-label="Nudge left">←</button>
+                <button onClick={() => handleKeyboardNudge(0.01, 0)} aria-label="Nudge right">→</button>
+              </div>
+              <p><small>Use arrow keys to nudge, add point at centre</small></p>
+            </div>
+          )}
 
           {zoneError && <p style={{ color: 'var(--critical)' }}>{zoneError}</p>}
 

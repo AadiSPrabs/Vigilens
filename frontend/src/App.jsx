@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import UploadZoneEditor from './components/UploadZoneEditor'
 import AuditImage from './components/AuditImage'
 import FindingsList from './components/FindingsList'
+import HazardLog from './components/HazardLog'
 import Banner from './components/Banner'
 import { analyzeImage, checkHealth } from './api/auditClient'
 
@@ -23,6 +24,7 @@ function App() {
   const [idempotencyKey, setIdempotencyKey] = useState(null)
   const [healthBanner, setHealthBanner] = useState(null)
   const [uploadedNaturalSize, setUploadedNaturalSize] = useState(null)
+  const [announce, setAnnounce] = useState('')
 
   const isFixtureMode = (import.meta.env.VITE_AUDIT_MODE || 'fixture') === 'fixture'
   const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
@@ -77,6 +79,7 @@ function App() {
     setError(null)
     setAudit(null)
     setTimeoutMessage(false)
+    setAnnounce('Analysis starting')
     const controller = new AbortController()
     setAbortController(controller)
     const snapshot = getSnapshot()
@@ -95,6 +98,7 @@ function App() {
         return
       }
       setAudit(result.audit || result)
+      setAnnounce('Analysis complete')
     } catch (err) {
       clearTimeout(timeoutId)
       if (currentSnapshotRef.current !== snapshot) {
@@ -104,6 +108,7 @@ function App() {
         setError('Analysis cancelled')
       } else {
         setError(err.message)
+        setAnnounce('Analysis error')
       }
     } finally {
       clearTimeout(timeoutId)
@@ -114,7 +119,6 @@ function App() {
   }
 
   const handleTryAgain = () => {
-    // Reuse same idempotency key
     handleAnalyse()
   }
 
@@ -135,6 +139,7 @@ function App() {
       </header>
       {healthBanner && <div className="banner" style={{ background: '#f87171', color: '#7f1d1d' }}>{healthBanner}</div>}
       <Banner fromFixture={showFixtureBanner} fixtureNotice={audit?.fixture_notice} />
+      <div aria-live="polite" aria-atomic="true" className="sr-only">{announce}</div>
       
       <main className="main">
         <div>
@@ -178,6 +183,16 @@ function App() {
                 audit={audit}
                 selectedId={selectedId}
                 onSelectPerson={setSelectedId}
+                decisions={decisions}
+                setDecisions={setDecisions}
+                filters={filters}
+                setFilters={setFilters}
+              />
+              <HazardLog 
+                audit={audit}
+                selectedId={selectedId}
+                onSelectPerson={setSelectedId}
+                decisions={decisions}
               />
               {showFixtureBanner && <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Evidence export disabled</p>}
               {audit.fixture_loaded_at && <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>fixture loaded at: {audit.fixture_loaded_at}</p>}
