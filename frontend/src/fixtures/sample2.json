@@ -1,0 +1,53 @@
+{
+  "audit_id": "audit-sample-2",
+  "image": { "id": "img-sample-2", "width": 1280, "height": 720 },
+  "zones": [
+    { "id": "zone-1", "name": "Crane Zone", "hazard": true,
+      "points": [
+        { "x": 0.0625, "y": 0.347 },
+        { "x": 0.375, "y": 0.347 },
+        { "x": 0.375, "y": 0.694 },
+        { "x": 0.0625, "y": 0.694 }
+      ]
+    }
+  ],
+  "persons": [
+    {
+      "id": "person-1",
+      "polygon": [
+        { "x": 0.176, "y": 0.708 },
+        { "x": 0.215, "y": 0.708 },
+        { "x": 0.215, "y": 0.931 },
+        { "x": 0.176, "y": 0.931 }
+      ],
+      "helmet": "absent",
+      "vest": "present",
+      "zone_id": "zone-1",
+      "worst_severity": "Critical",
+      "findings": [
+        { "rule_id": "NO_HELMET_IN_HAZARD", "severity": "Critical",
+          "message": "Person in Crane Zone without a helmet.",
+          "review_state": "needs_human_review", "recheck_trace": [] }
+      ]
+    },
+    {
+      "id": "person-2",
+      "polygon": [
+        { "x": 0.253, "y": 0.717 },
+        { "x": 0.293, "y": 0.717 },
+        { "x": 0.293, "y": 0.931 },
+        { "x": 0.253, "y": 0.931 }
+      ],
+      "helmet": "present",
+      "vest": "absent",
+      "zone_id": "zone-1",
+      "worst_severity": "Critical",
+      "findings": [
+        { "rule_id": "NO_VEST_IN_HAZARD", "severity": "Critical",
+          "message": "Person in Crane Zone without a high-visibility vest.",
+          "review_state": "needs_human_review", "recheck_trace": [] }
+      ]
+    }
+  ],
+  "evidence_image": null
+}

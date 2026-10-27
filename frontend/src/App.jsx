@@ -1,5 +1,10 @@
 import React, { useState } from 'react'
 import UploadZoneEditor from './components/UploadZoneEditor'
+import AuditImage from './components/AuditImage'
+import FindingsList from './components/FindingsList'
+import Banner from './components/Banner'
+import { analyzeImage } from './api/auditClient'
+import { resolveEvidence } from './lib/evidence'
 
 function App() {
   const [image, setImage] = useState(null)
@@ -10,19 +15,46 @@ function App() {
   const [filters, setFilters] = useState({ severity: 'all', zone: 'all' })
   const [sample, setSample] = useState(null)
   const [runWithoutZones, setRunWithoutZones] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [abortController, setAbortController] = useState(null)
 
-  // Clear audit/decisions/selection/filters when image, sample or zones change
   React.useEffect(() => {
     setAudit(null)
     setDecisions({})
     setSelectedId(null)
     setFilters({ severity: 'all', zone: 'all' })
+    setError(null)
   }, [image, sample, zones])
 
-  const handleAnalyse = () => {
-    // Will be wired in Phase 2
-    console.log('Analyse clicked - will be implemented in Phase 2')
+  const handleAnalyse = async () => {
+    setLoading(true)
+    setError(null)
+    setAudit(null)
+    const controller = new AbortController()
+    setAbortController(controller)
+    try {
+      const result = await analyzeImage({ file: image, zones, sampleId: sample?.id ?? null }, { signal: controller.signal })
+      setAudit(result)
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        setError('Analysis cancelled')
+      } else {
+        setError(err.message)
+      }
+    } finally {
+      setLoading(false)
+      setAbortController(null)
+    }
   }
+
+  const handleCancel = () => {
+    if (abortController) {
+      abortController.abort()
+    }
+  }
+
+  const isFromFixture = !!sample
 
   return (
     <div className="app">
@@ -30,7 +62,8 @@ function App() {
         <h1>Vigilens</h1>
         <span className="mode-badge">Mode: fixture</span>
       </header>
-
+      <Banner fromFixture={isFromFixture && audit} />
+      
       <main className="main">
         <div>
           <UploadZoneEditor
@@ -46,10 +79,39 @@ function App() {
           />
         </div>
         <div>
-          <div className="card">
-            <h2>Results</h2>
-            <p style={{color: 'var(--text-muted)'}}>Results will appear here in Phase 2</p>
-          </div>
+          {loading && (
+            <div className="card">
+              <p>Analyzing...</p>
+              <button className="btn btn-secondary" onClick={handleCancel}>Cancel</button>
+            </div>
+          )}
+          {error && (
+            <div className="card">
+              <p style={{ color: 'var(--critical)' }}>Error: {error}</p>
+              <button className="btn" onClick={handleAnalyse}>Retry</button>
+            </div>
+          )}
+          {audit && !loading && (
+            <>
+              <AuditImage 
+                imageSrc={resolveEvidence(audit, image ? URL.createObjectURL(image) : '').src}
+                audit={audit}
+                selectedId={selectedId}
+                onSelectPerson={setSelectedId}
+              />
+              <FindingsList 
+                audit={audit}
+                selectedId={selectedId}
+                onSelectPerson={setSelectedId}
+              />
+            </>
+          )}
+          {!audit && !loading && !error && (
+            <div className="card">
+              <h2>Results</h2>
+              <p style={{color: 'var(--text-muted)'}}>Run analysis to see results</p>
+            </div>
+          )}
         </div>
       </main>
     </div>

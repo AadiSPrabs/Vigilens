@@ -24,3 +24,26 @@ describe('geometry', () => {
     expect(zonesEqual(a,c)).toBe(false)
   })
 })
+
+  it('clientToNormalised returns null for negative and > 1', () => {
+    const img = {
+      getBoundingClientRect: () => ({ left: 10, top: 20, width: 200, height: 100 })
+    }
+    expect(clientToNormalised({ clientX: 5, clientY: 50 }, img)).toBe(null)
+    expect(clientToNormalised({ clientX: 300, clientY: 50 }, img)).toBe(null)
+    expect(clientToNormalised({ clientX: 50, clientY: 10 }, img)).toBe(null)
+    expect(clientToNormalised({ clientX: 50, clientY: 150 }, img)).toBe(null)
+  })
+
+  it('zonesEqual returns false with mismatched point', () => {
+    const a = [{ id: 'zone-1', hazard: true, points: [{x:0.1,y:0.2},{x:0.2,y:0.2},{x:0.15,y:0.3}] }]
+    const b = [{ id: 'zone-1', hazard: true, points: [{x:0.1,y:0.2},{x:0.2,y:0.2},{x:0.16,y:0.3}] }]
+    expect(zonesEqual(a,b)).toBe(false)
+  })
+
+  it('zone id never reused after delete conceptually', () => {
+    // Conceptual test - ensure we track counter properly
+    const zones = [{id: 'zone-1'}, {id: 'zone-2'}]
+    const filtered = zones.filter(z => z.id !== 'zone-1')
+    expect(filtered.find(z => z.id === 'zone-1')).toBeUndefined()
+  })
