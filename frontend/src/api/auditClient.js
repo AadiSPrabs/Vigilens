@@ -137,9 +137,18 @@ export async function checkHealth(baseUrl) {
   }
 }
 
+function makeSnapshotKey(image, zones) {
+  try {
+    return JSON.stringify({ name: image?.name, size: image?.size, zones })
+  } catch {
+    return String(Date.now())
+  }
+}
+
 export async function analyzeImage({ file, zones, sampleId }, options = {}) {
-  const { signal, snapshot, idempotencyKey } = options
+  const { signal, snapshot } = options
   const mode = import.meta.env.VITE_AUDIT_MODE || 'fixture'
+  const snapshotKey = snapshot || makeSnapshotKey(file, zones)
   
   if (mode === 'fixture') {
     await new Promise((resolve, reject) => {
@@ -160,7 +169,7 @@ export async function analyzeImage({ file, zones, sampleId }, options = {}) {
     if (fixtures[sampleId]) {
       const audit = fixtures[sampleId]
       validateAudit(audit, { mode: 'fixture' })
-      return { audit, snapshot }
+      return { audit, snapshot: snapshotKey }
     }
     
     throw new Error('Fixture mode only has results for the bundled sample images. Pick a sample, or switch to backend mode.')
@@ -168,7 +177,8 @@ export async function analyzeImage({ file, zones, sampleId }, options = {}) {
   
   const baseUrl = import.meta.env.VITE_API_BASE_URL || DEFAULT_BASE
   const { formData } = buildAuditRequest(file, zones)
-  const key = idempotencyKey || crypto.randomUUID()
+  // Generate via crypto.randomUUID(), tied to snapshot
+  const key = options.idempotencyKey || crypto.randomUUID()
   
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort('timeout'), 60000)
@@ -177,6 +187,7 @@ export async function analyzeImage({ file, zones, sampleId }, options = {}) {
   }
   
   try {
+    // Never set Content-Type manually on FormData
     const response = await fetch(baseUrl + BACKEND_ENDPOINT, {
       method: 'POST',
       body: formData,
@@ -184,23 +195,23 @@ export async function analyzeImage({ file, zones, sampleId }, options = {}) {
       signal: controller.signal
     })
     
+    if (response.status === 429) {
+      const retryAfter = response.headers.get('Retry-After')
+      throw new Error(`Rate limited. Retry-After: ${retryAfter || 'unknown'}`)
+    }
     if (response.status === 503) {
-      const contentType = response.headers.get('content-type')
-      if (contentType && contentType.includes('application/json')) {
-        try {
+      try {
+        const contentType = response.headers.get('content-type')
+        if (contentType && contentType.includes('application/json')) {
           const errJson = await response.json()
           if (errJson.error && errJson.error.message) {
             throw new Error(errJson.error.message)
           }
-        } catch (e) {
-          if (e.message && e.message.includes('FIXTURE')) throw e
         }
+      } catch (e) {
+        if (e.message && (e.message.includes('FIXTURE') || e.message.includes('Service'))) throw e
       }
       throw new Error('Service unavailable')
-    }
-    if (response.status === 429) {
-      const retryAfter = response.headers.get('Retry-After')
-      throw new Error(`Rate limited. Retry-After: ${retryAfter || 'unknown'}`)
     }
     if (response.status === 415) {
       throw new Error('Unsupported media type')
@@ -215,44 +226,48 @@ export async function analyzeImage({ file, zones, sampleId }, options = {}) {
       throw new Error('ZONES_TOO_LARGE')
     }
     if (response.status === 422) {
-      const contentType = response.headers.get('content-type')
-      if (contentType && contentType.includes('application/json')) {
-        try {
+      try {
+        const contentType = response.headers.get('content-type')
+        if (contentType && contentType.includes('application/json')) {
           const errJson = await response.json()
           if (errJson.error && errJson.error.message) {
             throw new Error(errJson.error.message)
           }
-        } catch (e) {}
-      }
+        }
+      } catch (e) {}
       throw new Error('Unprocessable entity')
     }
     
     if (!response.ok) {
-      const contentType = response.headers.get('content-type')
-      if (contentType && contentType.includes('application/json')) {
-        try {
+      try {
+        const contentType = response.headers.get('content-type')
+        if (contentType && contentType.includes('application/json')) {
           const errJson = await response.json()
           if (errJson.error && errJson.error.message) {
             throw new Error(errJson.error.message)
           }
-        } catch (e) {
-          if (e.message && !e.message.includes('JSON')) throw e
         }
+      } catch (e) {
+        if (e.message && !e.message.includes('JSON') && e.message !== 'Unexpected end of JSON input') throw e
       }
       throw new Error(`Backend error: ${response.status}`)
     }
     
-    const contentType = response.headers.get('content-type')
-    if (!contentType || !contentType.includes('application/json')) {
+    try {
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Invalid response format')
+      }
+      const audit = await response.json()
+      validateAudit(audit, { mode: 'backend' })
+      return { audit, snapshot: snapshotKey, idempotencyKey: key }
+    } catch (err) {
+      if (err.message && err.message.includes('Invalid audit')) throw err
       throw new Error('Invalid response format')
     }
-    
-    const audit = await response.json()
-    validateAudit(audit, { mode: 'backend' })
-    return { audit, snapshot, idempotencyKey: key }
   } catch (err) {
     if (err.name === 'AbortError' || err === 'timeout') {
-      throw new Error('No response yet; the audit may still be running')
+      throw new Error('No response yet; the audit may still be running.')
     }
     throw err
   } finally {
