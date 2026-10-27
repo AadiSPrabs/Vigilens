@@ -167,7 +167,10 @@ export async function analyzeImage({ file, zones, sampleId }, options = {}) {
     
     const fixtures = await loadFixtures()
     if (fixtures[sampleId]) {
-      const audit = fixtures[sampleId]
+      const audit = JSON.parse(JSON.stringify(fixtures[sampleId]))
+      if (!audit.schema_version) {
+        audit.schema_version = '0.2-local-draft'
+      }
       validateAudit(audit, { mode: 'fixture' })
       return { audit, snapshot: snapshotKey }
     }
