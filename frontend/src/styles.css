@@ -889,39 +889,85 @@ table tbody tr:focus-visible {
 @media print {
   @page {
     size: auto;
-    margin: 10mm;
+    margin: 12mm 12mm 14mm;
   }
 
+  html,
   body {
-    background: white !important;
+    background: #ffffff !important;
     background-image: none !important;
-    color: black !important;
+    color: #0f172a !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  /* Hide interactive/UI-only elements */
+  body {
+    margin: 0 !important;
+    font-size: 10pt;
+  }
+
+  .app {
+    display: block !important;
+    min-height: auto !important;
+  }
+
+  /* Hide all interactive web UI, leaving only report content. */
+  .topbar,
+  .mode-badge,
+  .banner,
+  .action-banner,
   header nav,
   .sample-picker,
-  .upload-zone-editor .zone-drawing-tools,
+  .upload-zone-editor,
+  .upload-area,
+  .zone-editor,
+  .zone-list,
+  .zone-item,
+  .controls,
   .keyboard-mode-controls,
-  .action-banner,
-  .banner,
+  .review,
   .review-decision,
   .review-radio-group,
   .filters,
+  .warning,
+  input,
+  select,
+  textarea,
   button,
   .btn,
-  [role="button"] {
+  .sample-btn,
+  .main > div:first-child,
+  .main > div:last-child > p,
+  div[style*="margin-bottom: 12px"],
+  div[style*="max-height: 600px"],
+  div:has(> select) {
     display: none !important;
   }
 
+  .main {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    grid-template-columns: none !important;
+  }
+
+  .main > div:last-child {
+    display: block !important;
+  }
+
   .card {
-    background: white !important;
-    border: 1px solid #999 !important;
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 0 !important;
     box-shadow: none !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
+    color: #0f172a !important;
+    padding: 10px 12px !important;
+    margin: 0 0 12px !important;
   }
 
   .card::before,
@@ -931,9 +977,13 @@ table tbody tr:focus-visible {
   }
 
   .card h2 {
-    border-bottom: 1px solid #999;
-    color: black !important;
+    border-bottom: 1px solid #0f172a !important;
+    color: #0f172a !important;
+    font-size: 12pt !important;
+    letter-spacing: 0.06em;
     text-shadow: none !important;
+    padding-bottom: 4px !important;
+    margin: 0 0 8px !important;
   }
 
   .card h2::before {
@@ -948,38 +998,78 @@ table tbody tr:focus-visible {
   h5,
   h6,
   legend {
-    color: black !important;
+    color: #0f172a !important;
     text-shadow: none !important;
   }
 
-  /* Show printable header */
+  /* Printable report header. */
   .print-header {
     display: block !important;
-    margin-bottom: 16px;
-    padding-bottom: 12px;
-    border-bottom: 2px solid #333;
+    margin: 0 0 14px !important;
+    padding: 0 0 10px !important;
+    border-bottom: 2px solid #0f172a !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 
   .print-header h1 {
-    font-size: 24px;
-    margin: 0 0 8px 0;
-    color: black;
+    margin: 0 0 6px !important;
+    color: #0f172a !important;
+    font-family: var(--font-mono);
+    font-size: 16pt !important;
+    line-height: 1.2;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
 
   .print-header .print-meta {
-    font-size: 11px;
-    color: #333;
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    color: #334155 !important;
+    font-family: var(--font-mono);
+    font-size: 8.5pt !important;
+    letter-spacing: 0.03em;
     line-height: 1.4;
   }
 
-  /* Image with overlays */
-  .audit-image-container,
-  .image-wrapper {
-    page-break-inside: avoid;
-    margin-bottom: 16px;
-    max-width: 100%;
+  .print-header .print-meta span {
+    white-space: nowrap;
   }
 
+  /* Mandatory legal footer. */
+  .print-footer {
+    display: block !important;
+    margin: 18px 0 0 !important;
+    padding: 8px 0 0 !important;
+    border-top: 1px solid #0f172a !important;
+    color: #334155 !important;
+    font-family: var(--font-mono);
+    font-size: 8pt !important;
+    letter-spacing: 0.02em;
+    line-height: 1.5;
+    text-align: center;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Audited image and overlays. */
+  .card:has(.zone-canvas-wrapper),
+  .audit-image-container,
+  .image-wrapper,
+  .zone-canvas-wrapper {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    max-width: 100% !important;
+  }
+
+  .zone-canvas-wrapper img {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  .zone-canvas-wrapper .zone-svg,
   .audit-image-container svg {
     position: absolute !important;
     inset: 0 !important;
@@ -987,36 +1077,55 @@ table tbody tr:focus-visible {
     height: 100% !important;
   }
 
-  /* Summary metrics */
-  .audit-summary,
-  .summary-line {
-    page-break-inside: avoid;
-    margin-bottom: 12px;
-    padding: 8px;
-    background: #f5f5f5 !important;
-    border: 1px solid #ccc;
-    font-weight: 600;
+  .zone-svg polygon,
+  .zone-svg .zone-polygon {
+    display: inline !important;
   }
 
-  /* Findings & Hazard Log table */
+  /* Audit summary bar. */
+  .audit-summary,
+  .summary-line,
+  .main > div:last-child > .card:nth-of-type(2) > p:first-of-type {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    margin: 0 0 10px !important;
+    padding: 7px 9px !important;
+    background: #f8fafc !important;
+    border: 1px solid #cbd5e1 !important;
+    border-left: 4px solid #0f172a !important;
+    color: #0f172a !important;
+    font-weight: 700;
+  }
+
+  .main > div:last-child > .card:nth-of-type(2) footer {
+    display: block !important;
+    color: #475569 !important;
+    font-size: 8.5pt !important;
+    margin-top: 6px !important;
+  }
+
+  /* Hazard Log / Findings data table. */
   .findings-table,
   .hazard-log table,
   table {
-    width: 100%;
-    border-collapse: collapse;
+    width: 100% !important;
+    border-collapse: collapse !important;
     page-break-inside: auto;
-    margin-bottom: 16px;
+    margin: 0 0 12px !important;
+    font-size: 8.5pt;
   }
 
   .findings-table thead,
-  .hazard-log thead {
+  .hazard-log thead,
+  thead {
     display: table-header-group;
   }
 
   .findings-table tr,
   .hazard-log tr,
   tr {
-    page-break-inside: avoid;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
     page-break-after: auto;
   }
 
@@ -1024,24 +1133,32 @@ table tbody tr:focus-visible {
   .findings-table th,
   .hazard-log th,
   th {
-    background: #e5e5e5 !important;
-    color: black !important;
-    border: 1px solid #666 !important;
-    padding: 6px 8px !important;
-    font-size: 10px;
+    background: #e2e8f0 !important;
+    color: #0f172a !important;
+    border: 1px solid #94a3b8 !important;
+    padding: 5px 6px !important;
+    font-size: 8pt !important;
     text-align: left;
-    letter-spacing: normal;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   table tbody td,
   .findings-table td,
   .hazard-log td,
   td {
-    background: white !important;
-    border: 1px solid #999 !important;
-    padding: 5px 8px !important;
-    font-size: 9px;
-    color: black !important;
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    padding: 5px 6px !important;
+    font-size: 8.5pt !important;
+    color: #0f172a !important;
+    vertical-align: top;
+  }
+
+  table tbody tr:nth-child(even) td {
+    background: #f8fafc !important;
   }
 
   table tbody tr,
@@ -1051,42 +1168,50 @@ table tbody tr:focus-visible {
     border-left: 0 !important;
   }
 
-  div[style*="padding: 0.75rem"],
-  div[style*="rgba(59, 130, 246, 0.1)"] {
-    background: white !important;
-    border-color: #999 !important;
-    border-left: 1px solid #999 !important;
-    box-shadow: none !important;
+  /* Retain distinct severity colors in the printed report. */
+  span[aria-label^="Severity:"] {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
-  .zone-item,
-  .warning {
-    background: white !important;
-    color: black !important;
-    border: 1px solid #999 !important;
+  span[aria-label^="Severity:"][style*="220, 38, 38"],
+  span[aria-label^="Severity:"][style*="#dc2626"] {
+    background: #fee2e2 !important;
+    border: 1px solid #dc2626 !important;
+    color: #b91c1c !important;
   }
 
-  span[aria-label^="Severity:"],
+  span[aria-label^="Severity:"][style*="245, 158, 11"],
+  span[aria-label^="Severity:"][style*="#f59e0b"] {
+    background: #fef3c7 !important;
+    border: 1px solid #d97706 !important;
+    color: #b45309 !important;
+  }
+
+  span[aria-label^="Severity:"][style*="100, 116, 139"],
+  span[aria-label^="Severity:"][style*="#64748b"] {
+    background: #e2e8f0 !important;
+    border: 1px solid #64748b !important;
+    color: #334155 !important;
+  }
+
+  span[aria-label^="Severity:"][style*="107, 114, 128"],
+  span[aria-label^="Severity:"][style*="#6b7280"] {
+    background: #f1f5f9 !important;
+    border: 1px solid #94a3b8 !important;
+    color: #334155 !important;
+  }
+
   span[style*="254, 243, 199"],
   span[style*="#fef3c7"] {
-    background: transparent !important;
-    border: 1px solid #666 !important;
-    color: black !important;
+    background: #cffafe !important;
+    border: 1px solid #0891b2 !important;
+    color: #0e7490 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
-  /* Printable footer */
-  .print-footer {
-    display: block !important;
-    margin-top: 20px;
-    padding-top: 10px;
-    border-top: 1px solid #333;
-    font-size: 10px;
-    font-style: italic;
-    color: #333;
-    text-align: center;
-  }
-
-  /* Ensure no backgrounds with transparency issues */
+  /* Ensure no screen-only effects leak into the PDF. */
   * {
     box-shadow: none !important;
     text-shadow: none !important;

@@ -140,6 +140,16 @@ function App() {
       {healthBanner && <div className="banner" style={{ background: '#f87171', color: '#7f1d1d' }}>{healthBanner}</div>}
       <Banner fromFixture={showFixtureBanner} fixtureNotice={audit?.fixture_notice} />
       <div aria-live="polite" aria-atomic="true" className="sr-only">{announce}</div>
+
+      {audit && !loading && (
+        <div className="print-header">
+          <h1>VIGILENS | SITE SAFETY AUDIT REPORT</h1>
+          <div className="print-meta">
+            <span>Audit ID: {audit.audit_id || audit.id || 'Not provided'}</span>
+            <span>Loaded: {audit.fixture_loaded_at || audit.created_at || 'Not provided'}</span>
+          </div>
+        </div>
+      )}
       
       <main className="main">
         <div>
@@ -207,6 +217,9 @@ function App() {
           )}
         </div>
       </main>
+      <div className="print-footer">
+        Prototype audit for human review - not a compliance certification.
+      </div>
     </div>
   )
 }
