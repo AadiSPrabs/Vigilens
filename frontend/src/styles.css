@@ -401,6 +401,49 @@ samp {
   stroke-dasharray: 0.005, 0.003;
 }
 
+.zone-region {
+  pointer-events: none;
+}
+
+.hud-reticle {
+  pointer-events: none;
+  animation: reticle-pulse 1.8s ease-in-out infinite;
+}
+
+.hud-reticle .reticle-corner,
+.hud-reticle .reticle-tick {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 0.003;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+}
+
+.hud-reticle .reticle-corner {
+  filter: drop-shadow(0 0 1px rgba(0, 240, 255, 0.7));
+}
+
+.hud-reticle .reticle-tick {
+  opacity: 0.85;
+}
+
+@keyframes reticle-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-reticle {
+    animation: none;
+    opacity: 0.9;
+  }
+}
+
 .zone-list {
   margin-top: 1rem;
 }

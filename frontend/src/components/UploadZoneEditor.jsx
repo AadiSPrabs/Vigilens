@@ -273,11 +273,39 @@ export default function UploadZoneEditor({
               role="img"
               aria-label="Zone overlay"
             >
+              <defs>
+                <pattern
+                  id="hazard-pattern"
+                  patternUnits="userSpaceOnUse"
+                  width="0.04"
+                  height="0.04"
+                  patternTransform="rotate(45)"
+                >
+                  <rect width="0.04" height="0.04" fill="#000000" opacity="0.12" />
+                  <line x1="0" y1="0" x2="0" y2="0.04" stroke="#f59e0b" strokeWidth="0.002" opacity="0.25" />
+                  <line x1="0.02" y1="0" x2="0.02" y2="0.04" stroke="#000000" strokeWidth="0.002" opacity="0.25" />
+                </pattern>
+                <pattern
+                  id="restricted-pattern"
+                  patternUnits="userSpaceOnUse"
+                  width="0.04"
+                  height="0.04"
+                  patternTransform="rotate(45)"
+                >
+                  <rect width="0.04" height="0.04" fill="#000000" opacity="0.1" />
+                  <line x1="0" y1="0" x2="0" y2="0.04" stroke="#94a3b8" strokeWidth="0.002" opacity="0.2" />
+                  <line x1="0.02" y1="0" x2="0.02" y2="0.04" stroke="#000000" strokeWidth="0.002" opacity="0.2" />
+                </pattern>
+              </defs>
               {(zones || []).map(zone => (
                 <polygon
                   key={zone.id}
                   className={`zone-polygon ${zone.hazard ? 'hazard' : ''}`}
                   points={zone.points.map(p => `${p.x},${p.y}`).join(' ')}
+                  fill={zone.hazard ? 'url(#hazard-pattern)' : 'url(#restricted-pattern)'}
+                  stroke={zone.hazard ? '#ff334b' : '#94a3b8'}
+                  strokeWidth="0.002"
+                  strokeLinejoin="round"
                   tabIndex={0}
                   role="button"
                   aria-label={`Zone ${zone.name}, ${zone.hazard ? 'hazard' : 'safe'}`}
