@@ -8,7 +8,7 @@ describe('Contract v0.2', () => {
     expect(result.src).toBe(null)
   })
 
-  it('uncertainty findings never render as violation or compliant', () => {
+  it('uncertainty findings never render as violation or fully equipped', () => {
     const finding = { kind: 'uncertainty', severity: null }
     expect(finding.kind).toBe('uncertainty')
     expect(finding.severity).toBe(null)

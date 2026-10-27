@@ -1,48 +1,39 @@
 # Vigilens Frontend
 
-React + Vite frontend for Vigilens PPE and site-safety auditing tool.
+## Stack
+- React + Vite + JavaScript + plain CSS
+- Testing: Vitest + @testing-library/react (dev only)
 
-## Setup
+## Environment Variables
+- `VITE_AUDIT_MODE` (fixture|backend) — defaults to fixture mode if not set. In fixture mode only bundled samples work. In backend mode posts to API.
+- `VITE_API_BASE_URL` — base URL for backend (default: `http://localhost:8000`). Requests go to `{VITE_API_BASE_URL}/audit`.
 
-```bash
-npm install
-npm run dev
-```
+## Running Modes
 
-Runs in fixture mode by default, no backend or env file required.
+### Fixture Mode (default)
+1. Install dependencies: `npm install`
+2. Run dev server: `npm run dev`
+3. Use one of the bundled sample images with preset zones. Fixture results only load for matching bundled samples with preset zones.
 
-## Modes
+### Local Backend Mode
+1. Set environment variables (e.g. `.env`):
+   ```
+   VITE_AUDIT_MODE=backend
+   VITE_API_BASE_URL=http://localhost:8000
+   ```
+2. Ensure your local backend implements `POST /audit` per `CONTRACT.md` (v0.2-local-draft) and `GET /health`.
+3. Start the frontend: `npm run dev`
+4. Upload an image and draw zones; requests use `FormData` with `image` and `zones` (JSON string) and `Idempotency-Key` header. No manual `Content-Type` is set.
 
-### Fixture mode (default)
-- Uses bundled sample images and audit fixtures
-- `VITE_AUDIT_MODE=fixture` (default)
-- Fixture results only appear for matching bundled samples with preset zones
-- Shows "SAMPLE DATA - not a real audit" banner
+## Contract Pairing Test Assets
+Contract test assets are in `src/fixtures/contract/`:
+- `contract-sample.png` — real binary raster PNG (1280x720) for backend pairing
+- `contract-sample.svg` — SVG overlay reference
+- `contract-zones.json` — zones with exact structure (zone-1 Crane Zone hazard true, zone-2 Storage Yard hazard false)
+- `sample-audit-v0_2.json` — sample audit response
+- `index.js`, `README.md`
 
-### Backend mode
-- `VITE_AUDIT_MODE=backend`
-- `VITE_API_BASE_URL=<backend-url>`
-- Sends multipart POST to backend endpoint (path to be confirmed with backend team)
-- No Meta API keys or calls from frontend
+To pair with a local backend manifest, use `contract-sample.png` with `contract-zones.json` and expect the contract sample audit shape. The UI includes a backend-only "Contract test (backend pairing)" picker.
 
-## Features
-
-- Upload images (jpg/png/webp, max 15MB) or use bundled samples
-- Draw hazard/safe zones on images with SVG overlay
-- Zones persist to localStorage for user uploads only (keyed by filename+size)
-- Samples use preset zones only, never read localStorage
-- PPE detection: hard hat, high-visibility vest (present/absent/unknown)
-- Severity: Critical (red), Medium (amber), Low (green), other values (including "High") render as grey with raw text
-- Full keyboard accessibility
-- Stale state detection - results cleared when image/zones change
-
-## Testing
-
-```bash
-npm test
-npm run build
-```
-
-## Swapping in real sample images
-
-Replace files in `src/fixtures/` (sample1.png, sample2.png, sample3.png) and update `src/fixtures/index.js` with corresponding preset zones. Ensure zone polygons align with figures in the images.
+## Demo Recording Note
+**Important:** Use licensed, real-world photos for the final hackathon demo recording. The bundled samples are synthetic and intended for development/testing only.

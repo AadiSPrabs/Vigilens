@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { getSeverityStyle, isPersonCompliant } from '../lib/severity'
+import { getSeverityStyle, isPersonFullyEquipped } from '../lib/severity'
 import { resolveEvidence } from '../lib/evidence'
 
 function getZoneLabelForPerson(audit, person) {
@@ -50,7 +50,7 @@ export default function AuditImage({ audit, selectedId, onSelectPerson, uploaded
   }
   
   const getPersonColor = (person) => {
-    if (isPersonCompliant(person)) {
+    if (isPersonFullyEquipped(person)) {
       return '#16a34a'
     }
     const findings = person.findings || []
