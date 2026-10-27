@@ -130,3 +130,15 @@ def memberships(points,zones,contact_known=True):
 
 def request_digest(image,zones):
     return hashlib.sha256((image.digest+json.dumps(zones,sort_keys=True,separators=(',',':'))).encode()).hexdigest()
+
+def pixel_only_png(data,declared_mime):
+    """Validate and re-encode upright RGB pixels; do not carry EXIF/PNG metadata.
+Request builders are offline only; metadata stripping is not permission to send.
+"""
+    decoded=decode_image(data,declared_mime)
+    if decoded.orientation!=1:fail('IMAGE_ORIENTATION_UNSUPPORTED','Use an upright raster before offline request construction.',422)
+    with Image.open(io.BytesIO(data)) as image:
+        rgb=image.convert('RGB');clean=Image.frombytes('RGB',rgb.size,rgb.tobytes())
+        out=io.BytesIO();clean.save(out,'PNG');result=out.getvalue()
+    if len(result)>MAX_BYTES:fail('REENCODED_IMAGE_TOO_LARGE','Pixel-only image exceeds local request limit.',413)
+    return result

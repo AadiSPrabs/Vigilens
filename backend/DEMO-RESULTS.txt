@@ -1,0 +1,21 @@
+{
+  "notice": "SYNTHETIC LOCAL DEMO ONLY - no model call, no real person or evidence release.",
+  "http_fixture_job": {
+    "state": "completed",
+    "duplicate_created_new_execution": false,
+    "source": "fixture"
+  },
+  "offline_pipeline": {
+    "state": "completed",
+    "assessment_status": "needs_human_review",
+    "helmet": "absent",
+    "vest": "unknown",
+    "ruleset_version": "draft-unapproved",
+    "finding_rule_ids": [
+      "VEST_UNKNOWN",
+      "NO_HELMET_IN_HAZARD"
+    ]
+  },
+  "evidence_status": "unavailable",
+  "evidence_export_allowed": false
+}

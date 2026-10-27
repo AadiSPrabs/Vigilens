@@ -1,3 +1,11 @@
+# Start with CURRENT.md
+
+CURRENT.md is the current coherent run guide and capability boundary. STATUS.md distinguishes implemented local work from unfinished items. The older foundation notes below are kept for review history, not the latest run contract.
+
+# Latest local development status
+
+This archive is an unpushed local continuation of the published fixture framework. Read OFFLINE-PIPELINE.md and JOB-API.md for current capabilities and limits. The sections below describe the earlier fixture foundation, not the later milestone. No real analysis or evidence release is enabled.
+
 # Vigilens local backend, review draft
 
 Local implementation dated 2026-10-27. Not committed, deployed, signed off, or connected to real models. No keys required, no outbound API calls. This replaces the unsafe sample-stub approach, not the team's agreed contract.

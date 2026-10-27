@@ -4,3 +4,5 @@ pillow==12.3.0
 pytest==9.1.1
 python-multipart==0.0.32
 uvicorn==0.54.0
+
+meta-sam-parser==0.0.6

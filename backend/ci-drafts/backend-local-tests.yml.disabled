@@ -1,0 +1,19 @@
+name: Local backend tests (draft configuration)
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '**/*.py'
+      - '**/requirements*.txt'
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: python -m pip install -r requirements-lock.txt
+      - run: sh scripts/check.sh

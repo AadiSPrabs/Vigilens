@@ -1,0 +1,10 @@
+{
+  "health_status": 200,
+  "first_status": 201,
+  "repeat_status": 200,
+  "duplicate_result_equal": true,
+  "source": "fixture",
+  "real_analysis_enabled": false,
+  "evidence_export_allowed": false,
+  "notice": "ACTUAL LOOPBACK HTTP / GENERATED SYNTHETIC INPUT ONLY"
+}
