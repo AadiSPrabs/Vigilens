@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { clientToNormalised } from '../lib/geometry'
+import { clientToNormalised, polygonArea, selfIntersects } from '../lib/geometry'
 import { saveZones, loadZones } from '../lib/storage'
 import { samples } from '../fixtures'
 import { canAnalyse } from '../lib/canAnalyse'
@@ -8,7 +8,7 @@ import { preCheckFile } from '../lib/validation'
 
 export default function UploadZoneEditor({ 
   image, setImage, zones, setZones, sample, setSample, 
-  runWithoutZones, setRunWithoutZones, onAnalyse 
+  runWithoutZones, setRunWithoutZones, onAnalyse, loading 
 }) {
   const [dragOver, setDragOver] = useState(false)
   const [drawing, setDrawing] = useState(false)
@@ -18,6 +18,7 @@ export default function UploadZoneEditor({
   const imgRef = useRef(null)
   const [zoneIdCounter, setZoneIdCounter] = useState(1)
   const [fileError, setFileError] = useState(null)
+  const [zoneError, setZoneError] = useState(null)
 
   useEffect(() => {
     if (zones && zones.length > 0 && runWithoutZones) {
@@ -82,12 +83,25 @@ export default function UploadZoneEditor({
   }
 
   const finishZone = () => {
-    if (currentPoints.length < 3) {
-      alert('Need at least 3 points')
+    setZoneError(null)
+    if ((zones || []).length >= 20) {
+      setZoneError('Too many zones. Maximum is 20.')
       return
     }
-    if ((zones || []).length >= 20) {
-      alert('Too many zones. Maximum is 20.')
+    if (currentPoints.length < 3) {
+      setZoneError('Need at least 3 points')
+      return
+    }
+    if (currentPoints.length > 100) {
+      setZoneError('Too many points per polygon. Maximum is 100.')
+      return
+    }
+    if (polygonArea(currentPoints) === 0) {
+      setZoneError('Zero-area polygon is not allowed')
+      return
+    }
+    if (selfIntersects(currentPoints)) {
+      setZoneError('Self-intersecting polygon is not allowed')
       return
     }
     const newZone = {
@@ -147,7 +161,7 @@ export default function UploadZoneEditor({
     return !zonesEqual(zones || [], sample.presetZones || [])
   }
 
-  const canRun = canAnalyse({ image, zones, runWithoutZones, sample })
+  const canRun = canAnalyse({ image, zones, runWithoutZones, sample }) && !loading
 
   return (
     <div className="card">
@@ -223,7 +237,7 @@ export default function UploadZoneEditor({
           </div>
 
           <div className="controls">
-            <button className="btn btn-secondary" onClick={() => { setDrawing(!drawing); setCurrentPoints([]) }}>
+            <button className="btn btn-secondary" onClick={() => { setDrawing(!drawing); setCurrentPoints([]); setZoneError(null) }}>
               {drawing ? 'Cancel Drawing' : 'Draw Zone'}
             </button>
             {drawing && (
@@ -234,6 +248,8 @@ export default function UploadZoneEditor({
               </>
             )}
           </div>
+
+          {zoneError && <p style={{ color: 'var(--critical)' }}>{zoneError}</p>}
 
           {drawing && (
             <div className="card" style={{marginTop: '0.5rem'}}>

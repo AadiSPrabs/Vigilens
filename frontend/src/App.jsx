@@ -19,6 +19,11 @@ function App() {
   const [abortController, setAbortController] = useState(null)
   const [timeoutMessage, setTimeoutMessage] = useState(false)
   const currentSnapshotRef = useRef(null)
+  const requestInFlightRef = useRef(false)
+  const [auditTime, setAuditTime] = useState(null)
+
+  const isStub = import.meta.env.VITE_AUDIT_STUB === 'true'
+  const isFixtureMode = (import.meta.env.VITE_AUDIT_MODE || 'fixture') === 'fixture'
 
   React.useEffect(() => {
     setAudit(null)
@@ -37,10 +42,13 @@ function App() {
   }
 
   const handleAnalyse = async () => {
+    if (requestInFlightRef.current || loading) return
+    requestInFlightRef.current = true
     setLoading(true)
     setError(null)
     setAudit(null)
     setTimeoutMessage(false)
+    setAuditTime(new Date().toISOString())
     const controller = new AbortController()
     setAbortController(controller)
     const snapshot = getSnapshot()
@@ -53,7 +61,6 @@ function App() {
     try {
       const result = await analyzeImage({ file: image, zones, sampleId: sample?.id ?? null }, { signal: controller.signal, snapshot })
       clearTimeout(timeoutId)
-      // Discard if snapshot no longer matches
       if (currentSnapshotRef.current !== snapshot) {
         return
       }
@@ -72,6 +79,7 @@ function App() {
       clearTimeout(timeoutId)
       setLoading(false)
       setAbortController(null)
+      requestInFlightRef.current = false
     }
   }
 
@@ -81,15 +89,16 @@ function App() {
     }
   }
 
-  const isFromFixture = !!sample && !!audit
+  const showFixtureBanner = isStub || (audit && audit.source === 'fixture') || (!!sample && !!audit && isFixtureMode)
+  const showStubBanner = isStub && !isFixtureMode
 
   return (
     <div className="app">
       <header className="topbar">
         <h1>Vigilens</h1>
-        <span className="mode-badge">Mode: fixture</span>
+        <span className="mode-badge">Mode: {isFixtureMode ? 'fixture' : 'backend'}</span>
       </header>
-      <Banner fromFixture={isFromFixture} />
+      <Banner fromFixture={showFixtureBanner} isStub={showStubBanner} />
       
       <main className="main">
         <div>
@@ -103,21 +112,23 @@ function App() {
             runWithoutZones={runWithoutZones}
             setRunWithoutZones={setRunWithoutZones}
             onAnalyse={handleAnalyse}
+            loading={loading}
           />
         </div>
         <div>
           {loading && (
             <div className="card">
               <p>Analyzing...</p>
+              {auditTime && <p><small>Audit run time: {auditTime}</small></p>}
               {timeoutMessage && <p style={{ color: 'var(--medium)' }}>No response yet; the audit may still be running</p>}
               <button className="btn btn-secondary" onClick={handleCancel}>Cancel</button>
-              {timeoutMessage && <button className="btn" onClick={handleAnalyse} style={{ marginLeft: '0.5rem' }}>Try again</button>}
+              {timeoutMessage && !requestInFlightRef.current && <button className="btn" onClick={handleAnalyse} style={{ marginLeft: '0.5rem' }}>Try again</button>}
             </div>
           )}
           {error && (
             <div className="card">
               <p style={{ color: 'var(--critical)' }}>{error}</p>
-              {error !== 'Analysis cancelled' && <button className="btn" onClick={handleAnalyse}>Retry</button>}
+              {error !== 'Analysis cancelled' && !loading && <button className="btn" onClick={handleAnalyse}>Retry</button>}
             </div>
           )}
           {audit && !loading && (
@@ -132,6 +143,7 @@ function App() {
                 selectedId={selectedId}
                 onSelectPerson={setSelectedId}
               />
+              {(showFixtureBanner || showStubBanner) && <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Evidence export disabled</p>}
             </>
           )}
           {!audit && !loading && !error && (

@@ -55,9 +55,15 @@ export default function FindingsList({ audit, selectedId, onSelectPerson }) {
       <h2>Findings ({allFindings.length})</h2>
       <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
         {allFindings.map(({ person, finding, pIdx, key }) => {
-          // Use finding's zone_id, fall back to person.zone_id
           const zoneId = finding.zone_id !== undefined ? finding.zone_id : person.zone_id
-          const zoneName = zoneId ? (audit.zones?.find(z => z.id === zoneId)?.name || 'Unknown zone') : 'Outside all zones'
+          let zoneName
+          if (zoneId === null) {
+            zoneName = 'No zone shown'
+          } else if (zoneId) {
+            zoneName = audit.zones?.find(z => z.id === zoneId)?.name || 'Unknown zone'
+          } else {
+            zoneName = 'No zone shown'
+          }
           const isSelected = selectedId === person.id
           const isUncertainty = finding.kind === 'uncertainty'
           

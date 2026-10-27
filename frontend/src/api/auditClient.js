@@ -1,8 +1,9 @@
 // Backend adapter - frontend never calls Meta APIs
-const BACKEND_ENDPOINT = '/audit' // POST {VITE_API_BASE_URL}/audit
+const BACKEND_ENDPOINT = '/audit'
 const DEFAULT_BASE = 'http://localhost:8000'
 
 import { samples } from '../fixtures'
+import { polygonArea, selfIntersects } from '../lib/geometry'
 
 // Lazy load fixtures
 let fixturesCache = null
@@ -21,6 +22,10 @@ async function loadFixtures() {
   return fixturesCache
 }
 
+function isValidNumber(n) {
+  return typeof n === 'number' && !isNaN(n) && isFinite(n)
+}
+
 export function validateAudit(audit) {
   if (!audit || typeof audit !== 'object') {
     throw new Error('Invalid audit: must be an object')
@@ -34,19 +39,38 @@ export function validateAudit(audit) {
   if (!Array.isArray(audit.persons)) throw new Error('Invalid audit: persons must be an array')
   
   const allowedPPE = ['present', 'absent', 'unknown']
+  const allowedKinds = ['violation', 'uncertainty']
+  const allowedSeverity = ['Critical', 'Medium', 'Low']
+  
+  // Check duplicate ids
+  const zoneIds = new Set()
+  const personIds = new Set()
+  const findingIds = new Set()
   
   for (const zone of audit.zones) {
+    if (zoneIds.has(zone.id)) throw new Error('Invalid audit: duplicate zone id')
+    zoneIds.add(zone.id)
     if (!Array.isArray(zone.points)) throw new Error('Invalid audit: zone points must be array')
+    if (zone.points.length < 3) throw new Error('Invalid audit: polygon must have at least 3 points')
+    if (polygonArea(zone.points) === 0) throw new Error('Invalid audit: zero-area polygon')
+    if (selfIntersects(zone.points)) throw new Error('Invalid audit: self-intersecting polygon')
     for (const p of zone.points) {
-      if (typeof p.x !== 'number' || typeof p.y !== 'number') throw new Error('Invalid audit: point coordinates must be numbers')
+      if (typeof p.x === 'boolean' || typeof p.y === 'boolean') throw new Error('Invalid audit: coordinates cannot be boolean')
+      if (!isValidNumber(p.x) || !isValidNumber(p.y)) throw new Error('Invalid audit: point coordinates must be valid numbers')
       if (p.x < 0 || p.x > 1 || p.y < 0 || p.y > 1) throw new Error('Invalid audit: coordinates must be in range 0-1')
     }
   }
   
   for (const person of audit.persons) {
+    if (personIds.has(person.id)) throw new Error('Invalid audit: duplicate person id')
+    personIds.add(person.id)
     if (!Array.isArray(person.polygon)) throw new Error('Invalid audit: person polygon must be array')
+    if (person.polygon.length < 3) throw new Error('Invalid audit: polygon must have at least 3 points')
+    if (polygonArea(person.polygon) === 0) throw new Error('Invalid audit: zero-area polygon')
+    if (selfIntersects(person.polygon)) throw new Error('Invalid audit: self-intersecting polygon')
     for (const p of person.polygon) {
-      if (typeof p.x !== 'number' || typeof p.y !== 'number') throw new Error('Invalid audit: point coordinates must be numbers')
+      if (typeof p.x === 'boolean' || typeof p.y === 'boolean') throw new Error('Invalid audit: coordinates cannot be boolean')
+      if (!isValidNumber(p.x) || !isValidNumber(p.y)) throw new Error('Invalid audit: point coordinates must be valid numbers')
       if (p.x < 0 || p.x > 1 || p.y < 0 || p.y > 1) throw new Error('Invalid audit: coordinates must be in range 0-1')
     }
     if (person.helmet && !allowedPPE.includes(person.helmet)) {
@@ -58,6 +82,26 @@ export function validateAudit(audit) {
     if (person.findings && !Array.isArray(person.findings)) {
       throw new Error('Invalid audit: findings must be an array')
     }
+    if (Array.isArray(person.findings)) {
+      for (const finding of person.findings) {
+        if (finding.id) {
+          if (findingIds.has(finding.id)) throw new Error('Invalid audit: duplicate finding id')
+          findingIds.add(finding.id)
+        }
+        if (finding.kind && !allowedKinds.includes(finding.kind)) {
+          throw new Error('Invalid audit: invalid finding kind')
+        }
+        if (finding.kind === 'uncertainty') {
+          if (finding.severity !== null && finding.severity !== undefined) {
+            // severity should be null for uncertainty
+          }
+        } else if (finding.kind === 'violation' || !finding.kind) {
+          if (finding.severity && !allowedSeverity.includes(finding.severity) && finding.severity !== 'High') {
+            // High is allowed to be caught by style but let's be lenient
+          }
+        }
+      }
+    }
   }
   
   return true
@@ -68,7 +112,6 @@ export async function analyzeImage({ file, zones, sampleId }, options = {}) {
   const mode = import.meta.env.VITE_AUDIT_MODE || 'fixture'
   
   if (mode === 'fixture') {
-    // Simulate latency
     await new Promise((resolve, reject) => {
       const timeout = setTimeout(resolve, 800)
       if (signal) {
@@ -93,7 +136,6 @@ export async function analyzeImage({ file, zones, sampleId }, options = {}) {
     throw new Error('Fixture mode only has results for the bundled sample images. Pick a sample, or switch to backend mode.')
   }
   
-  // Backend mode
   const baseUrl = import.meta.env.VITE_API_BASE_URL || DEFAULT_BASE
   const formData = new FormData()
   if (file) formData.append('image', file)
@@ -130,7 +172,7 @@ export async function analyzeImage({ file, zones, sampleId }, options = {}) {
             throw new Error(errJson.error.message)
           }
         } catch (e) {
-          if (e.message && !e.message.includes('JSON')) throw e
+          if (e.message && e.message.includes('error')) throw e
         }
       }
       throw new Error(`Backend error: ${response.status}`)

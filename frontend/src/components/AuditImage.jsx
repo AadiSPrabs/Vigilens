@@ -7,28 +7,32 @@ export default function AuditImage({ audit, selectedId, onSelectPerson }) {
   const evidence = resolveEvidence(audit)
   
   const getPersonColor = (person) => {
-    // Green only for explicit compliant person
     if (isPersonCompliant(person)) {
       return '#16a34a'
     }
-    // Has uncertainty only - not compliant, person outline neutral
     const findings = person.findings || []
     const hasUncertainty = findings.some(f => f.kind === 'uncertainty')
     if (hasUncertainty && findings.every(f => f.kind === 'uncertainty')) {
-      return '#64748b' // neutral
+      return '#64748b'
     }
     if (person.worst_severity) {
       const style = getSeverityStyle(person.worst_severity)
       return style.neutral ? '#64748b' : style.color
     }
-    return '#64748b' // neutral
+    return '#64748b'
   }
   
   const getPersonLabel = (person, idx) => {
     const findingsCount = (person.findings || []).length
-    // Use finding's zone if available, else person.zone_id
     const zoneId = person.findings?.[0]?.zone_id !== undefined ? person.findings[0].zone_id : person.zone_id
-    const zoneName = zoneId ? (audit.zones?.find(z => z.id === zoneId)?.name || 'Unknown zone') : 'outside all zones'
+    let zoneName
+    if (zoneId === null) {
+      zoneName = 'No zone shown'
+    } else if (zoneId) {
+      zoneName = audit.zones?.find(z => z.id === zoneId)?.name || 'Unknown zone'
+    } else {
+      zoneName = 'No zone shown'
+    }
     return `Person ${idx + 1}, ${findingsCount} findings, in ${zoneName}`
   }
   
@@ -57,7 +61,6 @@ export default function AuditImage({ audit, selectedId, onSelectPerson }) {
           role="img"
           aria-label="Audit overlays"
         >
-          {/* Zones - dashed blue */}
           {(audit.zones || []).map(zone => (
             <polygon
               key={zone.id}
@@ -68,7 +71,6 @@ export default function AuditImage({ audit, selectedId, onSelectPerson }) {
               strokeDasharray="0.01,0.005"
             />
           ))}
-          {/* Persons */}
           {(audit.persons || []).map((person, idx) => {
             const isSelected = selectedId === person.id
             const color = getPersonColor(person)
