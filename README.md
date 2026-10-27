@@ -89,14 +89,6 @@ _To be added as the implementation lands: prerequisites, environment
 variables (Meta Model API key), install steps, and how to run the audit
 pipeline and dashboard._
 
-## Team
-
-- **Representative:** _to be confirmed_
-- **Aadi Prabhu** ([@AadiSPrabs](https://github.com/AadiSPrabs))
-- **Teammate** — _to be added: name and GitHub handle of the second accepted
-  participant before submission. Only accepted hackathon participants are
-  listed as team members._
-
 ## Hackathon
 
 - Event: [Meta Global AI Developer Hackathon](https://cerebralvalley.ai/e/meta-ai-developer-hackathon) (Cerebral Valley × Meta)
