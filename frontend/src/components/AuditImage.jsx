@@ -2,21 +2,50 @@ import React, { useState } from 'react'
 import { getSeverityStyle, isPersonCompliant } from '../lib/severity'
 import { resolveEvidence } from '../lib/evidence'
 
-export default function AuditImage({ audit, selectedId, onSelectPerson }) {
+function getZoneLabelForPerson(audit, person) {
+  const zoneId = person.findings?.[0]?.zone_id !== undefined ? person.findings[0].zone_id : person.zone_id
+  const membership = audit.zone_membership_status
+  const zoneIds = audit.zone_ids
+  
+  if (zoneId !== null && zoneId !== undefined) {
+    if (Array.isArray(audit.zones)) {
+      const zone = audit.zones.find(z => z.id === zoneId)
+      if (zone) return zone.name
+    }
+    return 'Unknown zone'
+  }
+  
+  if (membership === 'unknown') {
+    return 'Zone unknown: ground contact uncertain, needs review'
+  }
+  if (membership === 'known') {
+    if (Array.isArray(zoneIds) && zoneIds.length === 0) {
+      if (Array.isArray(audit.zones) && audit.zones.length > 0) {
+        return 'Outside all drawn zones'
+      }
+      return 'No zones were checked'
+    }
+    if (Array.isArray(zoneIds) && zoneIds.length > 0) {
+      const names = zoneIds.map(zid => audit.zones?.find(z => z.id === zid)?.name).filter(Boolean)
+      if (names.length > 0) return names.join(', ')
+    }
+  }
+  return 'No zone shown'
+}
+
+export default function AuditImage({ audit, selectedId, onSelectPerson, uploadedNaturalSize, evidenceExportAllowed }) {
   const [imgError, setImgError] = useState(false)
-  const [imgMismatch, setImgMismatch] = useState(false)
   const evidence = resolveEvidence(audit)
   
-  const handleImageLoad = (e) => {
-    const img = e.target
-    const auditW = audit?.image?.width
-    const auditH = audit?.image?.height
-    if (auditW && auditH && img.naturalWidth && img.naturalHeight) {
-      const auditRatio = auditW / auditH
-      const imgRatio = img.naturalWidth / img.naturalHeight
-      if (Math.abs(auditRatio - imgRatio) / auditRatio > 0.01) {
-        setImgMismatch(true)
-      }
+  // Check image dimensions match
+  if (uploadedNaturalSize && audit.image) {
+    if (uploadedNaturalSize.width !== audit.image.width || uploadedNaturalSize.height !== audit.image.height) {
+      return (
+        <div className="card">
+          <h2>Audit Overlay</h2>
+          <p style={{ color: 'var(--critical)' }}>Response does not match the uploaded image</p>
+        </div>
+      )
     }
   }
   
@@ -38,25 +67,15 @@ export default function AuditImage({ audit, selectedId, onSelectPerson }) {
   
   const getPersonLabel = (person, idx) => {
     const findingsCount = (person.findings || []).length
-    const zoneId = person.findings?.[0]?.zone_id !== undefined ? person.findings[0].zone_id : person.zone_id
-    let zoneName
-    if (zoneId === null) {
-      zoneName = 'No zone shown'
-    } else if (zoneId) {
-      zoneName = audit.zones?.find(z => z.id === zoneId)?.name || 'Unknown zone'
-    } else {
-      zoneName = 'No zone shown'
-    }
+    const zoneName = getZoneLabelForPerson(audit, person)
     return `Person ${idx + 1}, ${findingsCount} findings, in ${zoneName}`
   }
   
-  if (!evidence.ok || imgError || imgMismatch) {
+  if (!evidence.ok || imgError) {
     return (
       <div className="card">
         <h2>Audit Overlay</h2>
-        <p style={{ color: 'var(--critical)' }}>
-          {imgMismatch ? 'Evidence image does not match the audited image' : 'Masked evidence unavailable'}
-        </p>
+        <p style={{ color: 'var(--critical)' }}>Masked evidence unavailable</p>
       </div>
     )
   }
@@ -69,7 +88,6 @@ export default function AuditImage({ audit, selectedId, onSelectPerson }) {
           src={evidence.src} 
           alt="Site image with audit overlays"
           onError={() => setImgError(true)}
-          onLoad={handleImageLoad}
         />
         <svg 
           className="zone-svg"

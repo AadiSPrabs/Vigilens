@@ -1,6 +1,39 @@
 import React, { useState } from 'react'
 import SeverityBadge from './SeverityBadge'
 
+function getZoneLabel(audit, person, finding) {
+  const zoneId = finding.zone_id !== undefined ? finding.zone_id : person.zone_id
+  const membership = audit.zone_membership_status
+  const zoneIds = audit.zone_ids
+  
+  if (zoneId !== null && zoneId !== undefined) {
+    if (Array.isArray(audit.zones)) {
+      const zone = audit.zones.find(z => z.id === zoneId)
+      if (zone) return zone.name
+    }
+    return 'Unknown zone'
+  }
+  
+  if (membership === 'unknown') {
+    return 'Zone unknown: ground contact uncertain, needs review'
+  }
+  if (membership === 'known') {
+    if (Array.isArray(zoneIds) && zoneIds.length === 0) {
+      if (Array.isArray(audit.zones) && audit.zones.length > 0) {
+        return 'Outside all drawn zones'
+      }
+      return 'No zones were checked'
+    }
+    if (Array.isArray(zoneIds) && zoneIds.length > 0) {
+      // find names
+      const names = zoneIds.map(zid => audit.zones?.find(z => z.id === zid)?.name).filter(Boolean)
+      if (names.length > 0) return names.join(', ')
+    }
+  }
+  // field missing
+  return 'No zone shown'
+}
+
 export default function FindingsList({ audit, selectedId, onSelectPerson }) {
   const [expanded, setExpanded] = useState({})
   
@@ -45,7 +78,7 @@ export default function FindingsList({ audit, selectedId, onSelectPerson }) {
     return (
       <div className="card">
         <h2>Findings</h2>
-        <p style={{ color: 'var(--success)' }}>✓ No findings - site is compliant</p>
+        <p style={{ color: 'var(--success)' }} title="Not a safety clearance">No listed violations</p>
       </div>
     )
   }
@@ -55,17 +88,10 @@ export default function FindingsList({ audit, selectedId, onSelectPerson }) {
       <h2>Findings ({allFindings.length})</h2>
       <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
         {allFindings.map(({ person, finding, pIdx, key }) => {
-          const zoneId = finding.zone_id !== undefined ? finding.zone_id : person.zone_id
-          let zoneName
-          if (zoneId === null) {
-            zoneName = 'No zone shown'
-          } else if (zoneId) {
-            zoneName = audit.zones?.find(z => z.id === zoneId)?.name || 'Unknown zone'
-          } else {
-            zoneName = 'No zone shown'
-          }
+          const zoneName = getZoneLabel(audit, person, finding)
           const isSelected = selectedId === person.id
           const isUncertainty = finding.kind === 'uncertainty'
+          const isIllustrative = audit.trace_provenance === 'illustrative_fixture_only'
           
           return (
             <div 
@@ -130,7 +156,7 @@ export default function FindingsList({ audit, selectedId, onSelectPerson }) {
                     className="btn btn-secondary"
                     style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem' }}
                   >
-                    {expanded[key] ? 'Hide' : 'Show'} How was this checked?
+                    {expanded[key] ? 'Hide' : 'Show'} {isIllustrative ? 'Illustrative (fixture), not a real re-check' : 'How was this checked?'}
                   </button>
                   {expanded[key] && (
                     <ul style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
@@ -145,6 +171,9 @@ export default function FindingsList({ audit, selectedId, onSelectPerson }) {
           )
         })}
       </div>
+      <footer style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+        schema {audit.schema_version} / rules {audit.ruleset_version}
+      </footer>
     </div>
   )
 }

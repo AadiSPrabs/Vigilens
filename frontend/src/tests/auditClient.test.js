@@ -4,6 +4,7 @@ import { validateAudit } from '../api/auditClient'
 describe('validateAudit', () => {
   it('accepts valid audit', () => {
     const audit = {
+      schema_version: '0.2',
       audit_id: 'a1',
       image: { id: 'i1', width: 1280, height: 720 },
       zones: [{ id: 'z1', name: 'Z', hazard: true, points: [{x:0.1,y:0.1},{x:0.2,y:0.1},{x:0.15,y:0.2}] }],
@@ -14,6 +15,7 @@ describe('validateAudit', () => {
 
   it('rejects out of range coordinate', () => {
     const audit = {
+      schema_version: '0.2',
       audit_id: 'a1',
       image: { id: 'i1', width: 1280, height: 720 },
       zones: [{ id: 'z1', name: 'Z', hazard: true, points: [{x:1.1,y:0.1},{x:0.2,y:0.1},{x:0.15,y:0.2}] }],
@@ -24,6 +26,7 @@ describe('validateAudit', () => {
 
   it('rejects bad helmet value', () => {
     const audit = {
+      schema_version: '0.2',
       audit_id: 'a1',
       image: { id: 'i1', width: 1280, height: 720 },
       zones: [],

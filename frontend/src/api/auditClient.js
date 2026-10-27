@@ -4,6 +4,7 @@ const DEFAULT_BASE = 'http://localhost:8000'
 
 import { samples } from '../fixtures'
 import { polygonArea, selfIntersects } from '../lib/geometry'
+import { buildAuditRequest } from '../lib/requestBuilder'
 
 // Lazy load fixtures
 let fixturesCache = null
@@ -30,6 +31,10 @@ export function validateAudit(audit) {
   if (!audit || typeof audit !== 'object') {
     throw new Error('Invalid audit: must be an object')
   }
+  const allowedSchemas = ['0.2', '0.2-local-draft']
+  if (!allowedSchemas.includes(audit.schema_version)) {
+    throw new Error('Invalid audit: unsupported schema_version')
+  }
   if (!audit.audit_id) throw new Error('Invalid audit: missing audit_id')
   if (!audit.image || typeof audit.image !== 'object') throw new Error('Invalid audit: missing image')
   if (typeof audit.image.width !== 'number' || typeof audit.image.height !== 'number') {
@@ -41,8 +46,16 @@ export function validateAudit(audit) {
   const allowedPPE = ['present', 'absent', 'unknown']
   const allowedKinds = ['violation', 'uncertainty']
   const allowedSeverity = ['Critical', 'Medium', 'Low']
+  const allowedEvidenceStatus = ['unavailable', 'masked', 'no_faces', 'masking_failed']
+  const allowedZoneMembership = ['known', 'unknown']
   
-  // Check duplicate ids
+  if (audit.evidence_status && !allowedEvidenceStatus.includes(audit.evidence_status)) {
+    throw new Error('Invalid audit: invalid evidence_status')
+  }
+  if (audit.zone_membership_status && !allowedZoneMembership.includes(audit.zone_membership_status)) {
+    throw new Error('Invalid audit: invalid zone_membership_status')
+  }
+  
   const zoneIds = new Set()
   const personIds = new Set()
   const findingIds = new Set()
@@ -91,24 +104,35 @@ export function validateAudit(audit) {
         if (finding.kind && !allowedKinds.includes(finding.kind)) {
           throw new Error('Invalid audit: invalid finding kind')
         }
-        if (finding.kind === 'uncertainty') {
-          if (finding.severity !== null && finding.severity !== undefined) {
-            // severity should be null for uncertainty
-          }
-        } else if (finding.kind === 'violation' || !finding.kind) {
-          if (finding.severity && !allowedSeverity.includes(finding.severity) && finding.severity !== 'High') {
-            // High is allowed to be caught by style but let's be lenient
-          }
+        if (finding.zone_id !== null && finding.zone_id !== undefined) {
+          if (!zoneIds.has(finding.zone_id)) throw new Error('Invalid audit: finding.zone_id not in zones')
         }
       }
+    }
+  }
+  
+  if (Array.isArray(audit.zone_ids)) {
+    for (const zid of audit.zone_ids) {
+      if (zid !== null && !zoneIds.has(zid)) throw new Error('Invalid audit: zone_ids entry not in zones')
     }
   }
   
   return true
 }
 
+export async function checkHealth(baseUrl) {
+  try {
+    const resp = await fetch((baseUrl || DEFAULT_BASE) + '/health')
+    if (!resp.ok) return { ok: false }
+    const data = await resp.json()
+    return { ok: true, data }
+  } catch (e) {
+    return { ok: false, error: e }
+  }
+}
+
 export async function analyzeImage({ file, zones, sampleId }, options = {}) {
-  const { signal, snapshot } = options
+  const { signal, snapshot, idempotencyKey } = options
   const mode = import.meta.env.VITE_AUDIT_MODE || 'fixture'
   
   if (mode === 'fixture') {
@@ -137,9 +161,8 @@ export async function analyzeImage({ file, zones, sampleId }, options = {}) {
   }
   
   const baseUrl = import.meta.env.VITE_API_BASE_URL || DEFAULT_BASE
-  const formData = new FormData()
-  if (file) formData.append('image', file)
-  formData.append('zones', JSON.stringify(zones || []))
+  const { formData } = buildAuditRequest(file, zones)
+  const key = idempotencyKey || crypto.randomUUID()
   
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort('timeout'), 60000)
@@ -151,16 +174,52 @@ export async function analyzeImage({ file, zones, sampleId }, options = {}) {
     const response = await fetch(baseUrl + BACKEND_ENDPOINT, {
       method: 'POST',
       body: formData,
+      headers: { 'Idempotency-Key': key },
       signal: controller.signal
     })
     
+    if (response.status === 503) {
+      const contentType = response.headers.get('content-type')
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          const errJson = await response.json()
+          if (errJson.error && errJson.error.message) {
+            throw new Error(errJson.error.message)
+          }
+        } catch (e) {
+          if (e.message && e.message.includes('FIXTURE')) throw e
+        }
+      }
+      // Could be FIXTURE_NOT_CONFIGURED or LOCAL_CACHE_FULL
+      throw new Error('Service unavailable')
+    }
     if (response.status === 429) {
       const retryAfter = response.headers.get('Retry-After')
       throw new Error(`Rate limited. Retry-After: ${retryAfter || 'unknown'}`)
     }
-    
     if (response.status === 415) {
       throw new Error('Unsupported media type')
+    }
+    if (response.status === 409) {
+      throw new Error('IDEMPOTENCY_CONFLICT')
+    }
+    if (response.status === 400) {
+      throw new Error('INVALID_IDEMPOTENCY_KEY')
+    }
+    if (response.status === 413) {
+      throw new Error('ZONES_TOO_LARGE')
+    }
+    if (response.status === 422) {
+      const contentType = response.headers.get('content-type')
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          const errJson = await response.json()
+          if (errJson.error && errJson.error.message) {
+            throw new Error(errJson.error.message)
+          }
+        } catch (e) {}
+      }
+      throw new Error('Unprocessable entity')
     }
     
     if (!response.ok) {
@@ -172,7 +231,7 @@ export async function analyzeImage({ file, zones, sampleId }, options = {}) {
             throw new Error(errJson.error.message)
           }
         } catch (e) {
-          if (e.message && e.message.includes('error')) throw e
+          if (e.message && !e.message.includes('JSON')) throw e
         }
       }
       throw new Error(`Backend error: ${response.status}`)
@@ -185,7 +244,7 @@ export async function analyzeImage({ file, zones, sampleId }, options = {}) {
     
     const audit = await response.json()
     validateAudit(audit)
-    return { audit, snapshot }
+    return { audit, snapshot, idempotencyKey: key }
   } catch (err) {
     if (err.name === 'AbortError' || err === 'timeout') {
       throw new Error('No response yet; the audit may still be running')

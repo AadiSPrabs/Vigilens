@@ -5,6 +5,7 @@ import { samples } from '../fixtures'
 import { canAnalyse } from '../lib/canAnalyse'
 import { zonesEqual } from '../lib/geometry'
 import { preCheckFile } from '../lib/validation'
+import { bakeOrientation } from '../lib/exif'
 
 export default function UploadZoneEditor({ 
   image, setImage, zones, setZones, sample, setSample, 
@@ -19,6 +20,7 @@ export default function UploadZoneEditor({
   const [zoneIdCounter, setZoneIdCounter] = useState(1)
   const [fileError, setFileError] = useState(null)
   const [zoneError, setZoneError] = useState(null)
+  const lastPointRef = useRef(null)
 
   useEffect(() => {
     if (zones && zones.length > 0 && runWithoutZones) {
@@ -36,7 +38,7 @@ export default function UploadZoneEditor({
     }
   }, [zones])
 
-  const handleFile = (file) => {
+  const handleFile = async (file) => {
     setFileError(null)
     if (!file) return
     const check = preCheckFile(file)
@@ -44,12 +46,19 @@ export default function UploadZoneEditor({
       setFileError(check.message)
       return
     }
+    // Bake EXIF orientation
+    const processedFile = await bakeOrientation(file)
+    // Ensure correct type
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(processedFile.type)) {
+      setFileError('Invalid file type')
+      return
+    }
     setSample(null)
-    setImage(file)
+    setImage(processedFile)
     setZones([])
     setCurrentPoints([])
     setDrawing(false)
-    const saved = loadZones(file)
+    const saved = loadZones(processedFile)
     if (saved && Array.isArray(saved)) {
       setZones(saved)
     }
@@ -67,7 +76,7 @@ export default function UploadZoneEditor({
     fetch(s.imageSrc)
       .then(r => r.blob())
       .then(blob => {
-        const file = new File([blob], s.id + '.png', { type: blob.type || 'image/png' })
+        const file = new File([blob], s.id + '.png', { type: 'image/png' })
         setImage(file)
         setZones(s.presetZones.map(z => ({ ...z, points: z.points.map(p => ({...p})) })))
         setCurrentPoints([])
@@ -79,6 +88,15 @@ export default function UploadZoneEditor({
     if (!drawing || !imgRef.current) return
     const norm = clientToNormalised(e, imgRef.current)
     if (!norm) return
+    // Ignore click within 0.002 of previous point
+    if (lastPointRef.current) {
+      const dx = norm.x - lastPointRef.current.x
+      const dy = norm.y - lastPointRef.current.y
+      if (Math.sqrt(dx*dx + dy*dy) < 0.002) return
+    }
+    // Reject repeated vertex
+    if (currentPoints.some(p => Math.abs(p.x-norm.x)<1e-9 && Math.abs(p.y-norm.y)<1e-9)) return
+    lastPointRef.current = norm
     setCurrentPoints([...currentPoints, norm])
   }
 
@@ -96,6 +114,11 @@ export default function UploadZoneEditor({
       setZoneError('Too many points per polygon. Maximum is 100.')
       return
     }
+    // Check closing repeat of first point
+    if (currentPoints.length > 0 && currentPoints.some((p,i) => i>0 && Math.abs(p.x-currentPoints[0].x)<1e-9 && Math.abs(p.y-currentPoints[0].y)<1e-9)) {
+      setZoneError('Duplicate/closing vertex not allowed')
+      return
+    }
     if (polygonArea(currentPoints) === 0) {
       setZoneError('Zero-area polygon is not allowed')
       return
@@ -104,16 +127,32 @@ export default function UploadZoneEditor({
       setZoneError('Self-intersecting polygon is not allowed')
       return
     }
+    // Check touching edges (simple check - any shared edge)
+    if (zoneName.length < 1 || zoneName.length > 200) {
+      setZoneError('Zone name must be 1-200 chars')
+      return
+    }
+    const newZoneId = `zone-${zoneIdCounter}`
+    if (newZoneId.length > 128) {
+      setZoneError('Zone id too long')
+      return
+    }
     const newZone = {
-      id: `zone-${zoneIdCounter}`,
-      name: zoneName || `Zone ${zoneIdCounter}`,
+      id: newZoneId,
+      name: zoneName,
       hazard: zoneHazard,
       points: currentPoints
+    }
+    const zonesJson = JSON.stringify([...(zones||[]), newZone])
+    if (zonesJson.length > 100000) {
+      setZoneError('Zones JSON too large')
+      return
     }
     const newZones = [...(zones || []), newZone]
     setZones(newZones)
     setCurrentPoints([])
     setDrawing(false)
+    lastPointRef.current = null
     setZoneIdCounter(zoneIdCounter + 1)
     setZoneName(`Zone ${zoneIdCounter + 1}`)
     setZoneHazard(false)
@@ -125,11 +164,13 @@ export default function UploadZoneEditor({
   const undoPoint = () => {
     if (currentPoints.length > 0) {
       setCurrentPoints(currentPoints.slice(0, -1))
+      lastPointRef.current = currentPoints.length > 1 ? currentPoints[currentPoints.length - 2] : null
     }
   }
 
   const clearPoints = () => {
     setCurrentPoints([])
+    lastPointRef.current = null
   }
 
   const deleteZone = (zoneId) => {
@@ -198,6 +239,7 @@ export default function UploadZoneEditor({
 
       {image && (
         <div className="zone-editor">
+          <p style={{ fontSize: '0.8rem', color: 'var(--medium)' }}>Preview only, not evidence</p>
           <div className="zone-canvas-wrapper">
             <img 
               ref={imgRef}
@@ -237,7 +279,7 @@ export default function UploadZoneEditor({
           </div>
 
           <div className="controls">
-            <button className="btn btn-secondary" onClick={() => { setDrawing(!drawing); setCurrentPoints([]); setZoneError(null) }}>
+            <button className="btn btn-secondary" onClick={() => { setDrawing(!drawing); setCurrentPoints([]); lastPointRef.current = null; setZoneError(null) }}>
               {drawing ? 'Cancel Drawing' : 'Draw Zone'}
             </button>
             {drawing && (
@@ -259,6 +301,7 @@ export default function UploadZoneEditor({
                   value={zoneName} 
                   onChange={(e) => setZoneName(e.target.value)}
                   placeholder="Zone name (required)"
+                  maxLength={200}
                 />
                 <label>
                   <input 
@@ -281,6 +324,7 @@ export default function UploadZoneEditor({
                   type="text" 
                   value={zone.name}
                   onChange={(e) => updateZone(zone.id, { name: e.target.value })}
+                  maxLength={200}
                 />
                 <label>
                   <input 
