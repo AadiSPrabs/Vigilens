@@ -33,6 +33,8 @@ function getZoneLabel(audit, person, finding) {
 }
 
 export default function FindingsList({ audit, selectedId, onSelectPerson, decisions, setDecisions, filters, setFilters }) {
+  if (!audit) return null
+  const handlePrint = () => { if (typeof window !== 'undefined') window.print() }
   const [expanded, setExpanded] = useState({})
   
   const toggleExpand = (key) => {
@@ -48,19 +50,25 @@ export default function FindingsList({ audit, selectedId, onSelectPerson, decisi
   
   if (!Array.isArray(audit.persons) || audit.persons.length === 0) {
     return (
-      <div className="card">
-        <h2>Findings</h2>
-        <p style={{ color: 'var(--critical)' }}>No people detected; not a safety clearance.</p>
-      </div>
+      <>
+        {audit && <div style={{marginBottom:'12px'}}><button type="button" onClick={handlePrint} aria-label="Print or export PDF">Print / Export PDF</button></div>}
+        <div className="card">
+          <h2>Findings</h2>
+          <p style={{ color: 'var(--critical)' }}>No people detected; not a safety clearance.</p>
+        </div>
+      </>
     )
   }
   
   if (!Array.isArray(audit.zones) || audit.zones.length === 0) {
     return (
-      <div className="card">
-        <h2>Findings</h2>
-        <p style={{ color: 'var(--medium)' }}>No zones were checked; this is not proof the area is safe.</p>
-      </div>
+      <>
+        {audit && <div style={{marginBottom:'12px'}}><button type="button" onClick={handlePrint} aria-label="Print or export PDF">Print / Export PDF</button></div>}
+        <div className="card">
+          <h2>Findings</h2>
+          <p style={{ color: 'var(--medium)' }}>No zones were checked; this is not proof the area is safe.</p>
+        </div>
+      </>
     )
   }
   
@@ -101,10 +109,13 @@ export default function FindingsList({ audit, selectedId, onSelectPerson, decisi
   
   if (allFindings.length === 0) {
     return (
-      <div className="card">
-        <h2>Findings</h2>
-        <p style={{ color: 'var(--success)' }} title="Not a safety clearance">No listed violations</p>
-      </div>
+      <>
+        {audit && <div style={{marginBottom:'12px'}}><button type="button" onClick={handlePrint} aria-label="Print or export PDF">Print / Export PDF</button></div>}
+        <div className="card">
+          <h2>Findings</h2>
+          <p style={{ color: 'var(--success)' }} title="Not a safety clearance">No listed violations</p>
+        </div>
+      </>
     )
   }
   
@@ -115,8 +126,10 @@ export default function FindingsList({ audit, selectedId, onSelectPerson, decisi
   }))]
   
   return (
-    <div className="card">
-      <h2>Findings ({allFindings.length})</h2>
+    <>
+      {audit && <div style={{marginBottom:'12px'}}><button type="button" onClick={handlePrint} aria-label="Print or export PDF">Print / Export PDF</button></div>}
+      <div className="card">
+        <h2>Findings ({allFindings.length})</h2>
       <p style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>
         {violationCount} findings - {criticalCount} Critical - {needsReviewCount} Needs Human Review
       </p>
@@ -239,6 +252,7 @@ export default function FindingsList({ audit, selectedId, onSelectPerson, decisi
       <footer style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
         schema {audit.schema_version} / rules {audit.ruleset_version}
       </footer>
-    </div>
+      </div>
+    </>
   )
 }
