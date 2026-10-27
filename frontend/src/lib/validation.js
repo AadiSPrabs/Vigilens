@@ -1,4 +1,5 @@
 // Frontend pre-checks before upload
+// All image dimension checks use browser-decoded naturalWidth/naturalHeight (matches EXIF-oriented display), not file metadata
 export function preCheckFile(file) {
   if (!file) return { ok: false, message: 'No file selected' }
   if (file.size > 15000000) {
@@ -7,6 +8,17 @@ export function preCheckFile(file) {
   const validTypes = ['image/jpeg', 'image/png', 'image/webp']
   if (!validTypes.includes(file.type)) {
     return { ok: false, message: 'Invalid file type. Please upload jpg, png, or webp.' }
+  }
+  return { ok: true }
+}
+
+export function preCheckImageDimensionsDecoded(width, height) {
+  // Use browser-decoded naturalWidth/naturalHeight (matches EXIF-oriented display)
+  if (width * height > 16000000) {
+    return { ok: false, message: 'Image too large. Maximum is 16 megapixels.' }
+  }
+  if (width > 4096 || height > 4096) {
+    return { ok: false, message: 'Image dimensions too large. Maximum is 4096x4096.' }
   }
   return { ok: true }
 }

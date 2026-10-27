@@ -4,7 +4,21 @@ import { resolveEvidence } from '../lib/evidence'
 
 export default function AuditImage({ audit, selectedId, onSelectPerson }) {
   const [imgError, setImgError] = useState(false)
+  const [imgMismatch, setImgMismatch] = useState(false)
   const evidence = resolveEvidence(audit)
+  
+  const handleImageLoad = (e) => {
+    const img = e.target
+    const auditW = audit?.image?.width
+    const auditH = audit?.image?.height
+    if (auditW && auditH && img.naturalWidth && img.naturalHeight) {
+      const auditRatio = auditW / auditH
+      const imgRatio = img.naturalWidth / img.naturalHeight
+      if (Math.abs(auditRatio - imgRatio) / auditRatio > 0.01) {
+        setImgMismatch(true)
+      }
+    }
+  }
   
   const getPersonColor = (person) => {
     if (isPersonCompliant(person)) {
@@ -36,11 +50,13 @@ export default function AuditImage({ audit, selectedId, onSelectPerson }) {
     return `Person ${idx + 1}, ${findingsCount} findings, in ${zoneName}`
   }
   
-  if (!evidence.ok || imgError) {
+  if (!evidence.ok || imgError || imgMismatch) {
     return (
       <div className="card">
         <h2>Audit Overlay</h2>
-        <p style={{ color: 'var(--critical)' }}>Masked evidence unavailable</p>
+        <p style={{ color: 'var(--critical)' }}>
+          {imgMismatch ? 'Evidence image does not match the audited image' : 'Masked evidence unavailable'}
+        </p>
       </div>
     )
   }
@@ -53,6 +69,7 @@ export default function AuditImage({ audit, selectedId, onSelectPerson }) {
           src={evidence.src} 
           alt="Site image with audit overlays"
           onError={() => setImgError(true)}
+          onLoad={handleImageLoad}
         />
         <svg 
           className="zone-svg"
