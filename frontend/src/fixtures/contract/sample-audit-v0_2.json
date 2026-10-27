@@ -1,6 +1,6 @@
 {
   "audit_id": "contract-001",
-  "schema_version": "0.2",
+  "schema_version": "0.2-local-draft",
   "ruleset_version": "0.2",
   "source": "backend",
   "created_at": "2026-10-27T00:00:00Z",

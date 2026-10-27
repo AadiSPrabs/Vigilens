@@ -34,7 +34,7 @@ export function validateAudit(audit, options = {}) {
   }
   const allowedSchemas = ['0.2', '0.2-local-draft']
   if (!allowedSchemas.includes(audit.schema_version)) {
-    throw new Error('Unsupported schema version')
+    throw new Error(`Unsupported schema version: "${audit?.schema_version ?? 'missing'}" (expected "0.2" or "0.2-local-draft")`)
   }
   if (!audit.audit_id) throw new Error('Invalid audit: missing audit_id')
   if (!audit.image || typeof audit.image !== 'object') throw new Error('Invalid audit: missing image')

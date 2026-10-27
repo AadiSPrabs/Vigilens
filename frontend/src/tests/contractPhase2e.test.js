@@ -41,6 +41,6 @@ describe('Phase 2e', () => {
       zones: [],
       persons: []
     }
-    expect(() => validateAudit(audit)).toThrow('Unsupported schema version')
+    expect(() => validateAudit(audit)).toThrow('Unsupported schema version:')
   })
 })
