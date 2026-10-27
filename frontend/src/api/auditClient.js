@@ -1,6 +1,6 @@
 // Backend adapter - frontend never calls Meta APIs
-// unconfirmed - agree with backend teammate on endpoint path
-const BACKEND_ENDPOINT = '/api/analyze' // unconfirmed - agree with backend teammate
+const BACKEND_ENDPOINT = '/audit' // POST {VITE_API_BASE_URL}/audit
+const DEFAULT_BASE = 'http://localhost:8000'
 
 import { samples } from '../fixtures'
 
@@ -64,7 +64,7 @@ export function validateAudit(audit) {
 }
 
 export async function analyzeImage({ file, zones, sampleId }, options = {}) {
-  const { signal } = options
+  const { signal, snapshot } = options
   const mode = import.meta.env.VITE_AUDIT_MODE || 'fixture'
   
   if (mode === 'fixture') {
@@ -87,29 +87,69 @@ export async function analyzeImage({ file, zones, sampleId }, options = {}) {
     if (fixtures[sampleId]) {
       const audit = fixtures[sampleId]
       validateAudit(audit)
-      return audit
+      return { audit, snapshot }
     }
     
     throw new Error('Fixture mode only has results for the bundled sample images. Pick a sample, or switch to backend mode.')
   }
   
   // Backend mode
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || DEFAULT_BASE
   const formData = new FormData()
   if (file) formData.append('image', file)
   formData.append('zones', JSON.stringify(zones || []))
   
-  const response = await fetch(baseUrl + BACKEND_ENDPOINT, {
-    method: 'POST',
-    body: formData,
-    signal
-  })
-  
-  if (!response.ok) {
-    throw new Error(`Backend error: ${response.status}`)
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort('timeout'), 60000)
+  if (signal) {
+    signal.addEventListener('abort', () => controller.abort(signal.reason))
   }
   
-  const audit = await response.json()
-  validateAudit(audit)
-  return audit
+  try {
+    const response = await fetch(baseUrl + BACKEND_ENDPOINT, {
+      method: 'POST',
+      body: formData,
+      signal: controller.signal
+    })
+    
+    if (response.status === 429) {
+      const retryAfter = response.headers.get('Retry-After')
+      throw new Error(`Rate limited. Retry-After: ${retryAfter || 'unknown'}`)
+    }
+    
+    if (response.status === 415) {
+      throw new Error('Unsupported media type')
+    }
+    
+    if (!response.ok) {
+      const contentType = response.headers.get('content-type')
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          const errJson = await response.json()
+          if (errJson.error && errJson.error.message) {
+            throw new Error(errJson.error.message)
+          }
+        } catch (e) {
+          if (e.message && !e.message.includes('JSON')) throw e
+        }
+      }
+      throw new Error(`Backend error: ${response.status}`)
+    }
+    
+    const contentType = response.headers.get('content-type')
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error('Invalid response format')
+    }
+    
+    const audit = await response.json()
+    validateAudit(audit)
+    return { audit, snapshot }
+  } catch (err) {
+    if (err.name === 'AbortError' || err === 'timeout') {
+      throw new Error('No response yet; the audit may still be running')
+    }
+    throw err
+  } finally {
+    clearTimeout(timeoutId)
+  }
 }

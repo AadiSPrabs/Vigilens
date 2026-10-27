@@ -4,6 +4,7 @@ import { saveZones, loadZones } from '../lib/storage'
 import { samples } from '../fixtures'
 import { canAnalyse } from '../lib/canAnalyse'
 import { zonesEqual } from '../lib/geometry'
+import { preCheckFile } from '../lib/validation'
 
 export default function UploadZoneEditor({ 
   image, setImage, zones, setZones, sample, setSample, 
@@ -16,6 +17,7 @@ export default function UploadZoneEditor({
   const [zoneHazard, setZoneHazard] = useState(false)
   const imgRef = useRef(null)
   const [zoneIdCounter, setZoneIdCounter] = useState(1)
+  const [fileError, setFileError] = useState(null)
 
   useEffect(() => {
     if (zones && zones.length > 0 && runWithoutZones) {
@@ -34,14 +36,11 @@ export default function UploadZoneEditor({
   }, [zones])
 
   const handleFile = (file) => {
+    setFileError(null)
     if (!file) return
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp']
-    if (!validTypes.includes(file.type)) {
-      alert('Invalid file type. Please upload jpg, png, or webp.')
-      return
-    }
-    if (file.size > 15 * 1024 * 1024) {
-      alert('File too large. Maximum size is 15 MB.')
+    const check = preCheckFile(file)
+    if (!check.ok) {
+      setFileError(check.message)
       return
     }
     setSample(null)
@@ -85,6 +84,10 @@ export default function UploadZoneEditor({
   const finishZone = () => {
     if (currentPoints.length < 3) {
       alert('Need at least 3 points')
+      return
+    }
+    if ((zones || []).length >= 20) {
+      alert('Too many zones. Maximum is 20.')
       return
     }
     const newZone = {
@@ -176,6 +179,7 @@ export default function UploadZoneEditor({
           onChange={(e) => handleFile(e.target.files[0])}
         />
         <p><small>jpg, png, webp • Max 15 MB</small></p>
+        {fileError && <p style={{ color: 'var(--critical)' }}>{fileError}</p>}
       </div>
 
       {image && (

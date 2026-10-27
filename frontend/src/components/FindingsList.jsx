@@ -15,10 +15,29 @@ export default function FindingsList({ audit, selectedId, onSelectPerson }) {
     return value
   }
   
+  if (!Array.isArray(audit.persons) || audit.persons.length === 0) {
+    return (
+      <div className="card">
+        <h2>Findings</h2>
+        <p style={{ color: 'var(--critical)' }}>No people detected; not a safety clearance.</p>
+      </div>
+    )
+  }
+  
+  if (!Array.isArray(audit.zones) || audit.zones.length === 0) {
+    return (
+      <div className="card">
+        <h2>Findings</h2>
+        <p style={{ color: 'var(--medium)' }}>No zones were checked; this is not proof the area is safe.</p>
+      </div>
+    )
+  }
+  
   const allFindings = []
   ;(audit.persons || []).forEach((person, pIdx) => {
     (person.findings || []).forEach((finding, fIdx) => {
-      allFindings.push({ person, finding, pIdx, fIdx, key: `${person.id}-${fIdx}` })
+      const findingKey = finding.id || `${person.id}:${finding.rule_id}:${fIdx}`
+      allFindings.push({ person, finding, pIdx, fIdx, key: findingKey })
     })
   })
   
@@ -36,8 +55,11 @@ export default function FindingsList({ audit, selectedId, onSelectPerson }) {
       <h2>Findings ({allFindings.length})</h2>
       <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
         {allFindings.map(({ person, finding, pIdx, key }) => {
-          const zoneName = audit.zones?.find(z => z.id === person.zone_id)?.name || 'Outside zones'
+          // Use finding's zone_id, fall back to person.zone_id
+          const zoneId = finding.zone_id !== undefined ? finding.zone_id : person.zone_id
+          const zoneName = zoneId ? (audit.zones?.find(z => z.id === zoneId)?.name || 'Unknown zone') : 'Outside all zones'
           const isSelected = selectedId === person.id
+          const isUncertainty = finding.kind === 'uncertainty'
           
           return (
             <div 
@@ -74,7 +96,22 @@ export default function FindingsList({ audit, selectedId, onSelectPerson }) {
               </div>
               
               <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <SeverityBadge severity={finding.severity} />
+                {isUncertainty ? (
+                  <span 
+                    style={{ 
+                      color: '#92400e', 
+                      background: '#fef3c7', 
+                      padding: '0.25rem 0.5rem', 
+                      borderRadius: '4px',
+                      fontSize: '0.875rem',
+                      fontWeight: '600'
+                    }}
+                  >
+                    Uncertain - needs human check
+                  </span>
+                ) : (
+                  <SeverityBadge severity={finding.severity} />
+                )}
                 <code style={{ fontSize: '0.75rem', background: 'var(--panel)', padding: '0.25rem' }}>{finding.rule_id}</code>
               </div>
               

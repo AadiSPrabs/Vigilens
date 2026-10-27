@@ -39,5 +39,7 @@
       "findings": []
     }
   ],
-  "evidence_image": null
+  "evidence_image": { "url": "./fixtures/sample1.png" },
+  "evidence_status": "no_faces",
+  "source": "fixture"
 }

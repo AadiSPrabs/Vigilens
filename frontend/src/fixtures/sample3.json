@@ -9,6 +9,14 @@
         { "x": 0.508, "y": 0.722 },
         { "x": 0.117, "y": 0.722 }
       ]
+    },
+    { "id": "zone-2", "name": "Restricted Area", "hazard": true,
+      "points": [
+        { "x": 0.3, "y": 0.4 },
+        { "x": 0.6, "y": 0.4 },
+        { "x": 0.6, "y": 0.8 },
+        { "x": 0.3, "y": 0.8 }
+      ]
     }
   ],
   "persons": [
@@ -25,9 +33,9 @@
       "zone_id": "zone-1",
       "worst_severity": "Critical",
       "findings": [
-        { "rule_id": "NO_VEST_OUTSIDE_ZONE", "severity": "Low", "message": "Vest compliance issue noted.", "review_state": "auto", "recheck_trace": [] },
-        { "rule_id": "NO_HELMET_IN_HAZARD",  "severity": "Critical", "message": "Person in Crane Zone without a helmet.", "review_state": "needs_human_review", "recheck_trace": ["Low confidence (0.54)", "Re-segmented head crop", "Still no hard hat (0.88)"] },
-        { "rule_id": "NO_VEST_IN_HAZARD",    "severity": "Medium", "message": "Person in Crane Zone without a high-visibility vest.", "review_state": "auto", "recheck_trace": [] }
+        { "id": "f4a", "rule_id": "NO_VEST_IN_HAZARD", "severity": "Medium", "kind": "violation", "zone_id": "zone-2", "message": "Vest violation in restricted area.", "review_state": "auto", "recheck_trace": [] },
+        { "id": "f4b", "rule_id": "NO_HELMET_IN_HAZARD",  "severity": "Critical", "kind": "violation", "zone_id": "zone-1", "message": "Person in Crane Zone without a helmet.", "review_state": "needs_human_review", "recheck_trace": ["Low confidence", "Re-segmented head crop", "Still no hard hat"] },
+        { "id": "f4c", "rule_id": "NO_VEST_IN_HAZARD",    "severity": "Medium", "kind": "violation", "zone_id": "zone-2", "message": "Vest violation in restricted area.", "review_state": "auto", "recheck_trace": [] }
       ]
     },
     {
@@ -42,8 +50,8 @@
       "vest": "absent",
       "zone_id": "zone-1",
       "findings": [
-        { "rule_id": "NO_VEST_OUTSIDE_ZONE", "severity": "Low", "message": "Vest compliance issue noted.", "review_state": "auto", "recheck_trace": [] },
-        { "rule_id": "NO_VEST_IN_HAZARD",    "severity": "Medium", "message": "Person in Crane Zone without a high-visibility vest.", "review_state": "auto", "recheck_trace": [] }
+        { "id": "f5a", "rule_id": "NO_VEST_IN_HAZARD", "severity": "Medium", "kind": "violation", "zone_id": "zone-2", "message": "Vest violation in restricted area.", "review_state": "auto", "recheck_trace": [] },
+        { "id": "f5b", "rule_id": "NO_VEST_IN_HAZARD",    "severity": "Low", "kind": "violation", "zone_id": "zone-1", "message": "Vest compliance issue in hazard zone.", "review_state": "auto", "recheck_trace": [] }
       ]
     },
     {
@@ -57,10 +65,28 @@
       "helmet": "unknown",
       "vest": "present",
       "zone_id": "zone-1",
+      "worst_severity": null,
       "findings": [
-        { "rule_id": "PPE_UNKNOWN", "severity": "High", "message": "Helmet visibility unclear in this image.", "review_state": "needs_human_review", "recheck_trace": ["Occlusion detected"] }
+        { "id": "f6a", "rule_id": "PPE_UNKNOWN", "kind": "uncertainty", "severity": null, "message": "Helmet visibility unclear in this image.", "review_state": "needs_human_review", "recheck_trace": ["Occlusion detected", "Low view angle"] }
+      ]
+    },
+    {
+      "id": "person-7",
+      "polygon": [
+        { "x": 0.8, "y": 0.8 },
+        { "x": 0.85, "y": 0.8 },
+        { "x": 0.85, "y": 0.95 },
+        { "x": 0.8, "y": 0.95 }
+      ],
+      "helmet": "present",
+      "vest": "absent",
+      "zone_id": null,
+      "findings": [
+        { "id": "f7a", "rule_id": "MISSING_VEST", "severity": "Low", "kind": "violation", "zone_id": null, "message": "Missing high-visibility vest outside marked zones.", "review_state": "auto", "recheck_trace": [] }
       ]
     }
   ],
-  "evidence_image": null
+  "evidence_image": { "url": "./fixtures/sample3.png" },
+  "evidence_status": "no_faces",
+  "source": "fixture"
 }

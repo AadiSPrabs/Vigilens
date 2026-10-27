@@ -1,10 +1,9 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import UploadZoneEditor from './components/UploadZoneEditor'
 import AuditImage from './components/AuditImage'
 import FindingsList from './components/FindingsList'
 import Banner from './components/Banner'
 import { analyzeImage } from './api/auditClient'
-import { resolveEvidence } from './lib/evidence'
 
 function App() {
   const [image, setImage] = useState(null)
@@ -18,6 +17,8 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [abortController, setAbortController] = useState(null)
+  const [timeoutMessage, setTimeoutMessage] = useState(false)
+  const currentSnapshotRef = useRef(null)
 
   React.useEffect(() => {
     setAudit(null)
@@ -25,24 +26,50 @@ function App() {
     setSelectedId(null)
     setFilters({ severity: 'all', zone: 'all' })
     setError(null)
+    setTimeoutMessage(false)
+    if (abortController) {
+      abortController.abort()
+    }
   }, [image, sample, zones])
+
+  const getSnapshot = () => {
+    return JSON.stringify({ imageName: image?.name, imageSize: image?.size, zones, sampleId: sample?.id })
+  }
 
   const handleAnalyse = async () => {
     setLoading(true)
     setError(null)
     setAudit(null)
+    setTimeoutMessage(false)
     const controller = new AbortController()
     setAbortController(controller)
+    const snapshot = getSnapshot()
+    currentSnapshotRef.current = snapshot
+    
+    const timeoutId = setTimeout(() => {
+      setTimeoutMessage(true)
+    }, 60000)
+    
     try {
-      const result = await analyzeImage({ file: image, zones, sampleId: sample?.id ?? null }, { signal: controller.signal })
-      setAudit(result)
+      const result = await analyzeImage({ file: image, zones, sampleId: sample?.id ?? null }, { signal: controller.signal, snapshot })
+      clearTimeout(timeoutId)
+      // Discard if snapshot no longer matches
+      if (currentSnapshotRef.current !== snapshot) {
+        return
+      }
+      setAudit(result.audit || result)
     } catch (err) {
+      clearTimeout(timeoutId)
+      if (currentSnapshotRef.current !== snapshot) {
+        return
+      }
       if (err.name === 'AbortError') {
         setError('Analysis cancelled')
       } else {
         setError(err.message)
       }
     } finally {
+      clearTimeout(timeoutId)
       setLoading(false)
       setAbortController(null)
     }
@@ -54,7 +81,7 @@ function App() {
     }
   }
 
-  const isFromFixture = !!sample
+  const isFromFixture = !!sample && !!audit
 
   return (
     <div className="app">
@@ -62,7 +89,7 @@ function App() {
         <h1>Vigilens</h1>
         <span className="mode-badge">Mode: fixture</span>
       </header>
-      <Banner fromFixture={isFromFixture && audit} />
+      <Banner fromFixture={isFromFixture} />
       
       <main className="main">
         <div>
@@ -82,19 +109,20 @@ function App() {
           {loading && (
             <div className="card">
               <p>Analyzing...</p>
+              {timeoutMessage && <p style={{ color: 'var(--medium)' }}>No response yet; the audit may still be running</p>}
               <button className="btn btn-secondary" onClick={handleCancel}>Cancel</button>
+              {timeoutMessage && <button className="btn" onClick={handleAnalyse} style={{ marginLeft: '0.5rem' }}>Try again</button>}
             </div>
           )}
           {error && (
             <div className="card">
-              <p style={{ color: 'var(--critical)' }}>Error: {error}</p>
-              <button className="btn" onClick={handleAnalyse}>Retry</button>
+              <p style={{ color: 'var(--critical)' }}>{error}</p>
+              {error !== 'Analysis cancelled' && <button className="btn" onClick={handleAnalyse}>Retry</button>}
             </div>
           )}
           {audit && !loading && (
             <>
               <AuditImage 
-                imageSrc={resolveEvidence(audit, image ? URL.createObjectURL(image) : '').src}
                 audit={audit}
                 selectedId={selectedId}
                 onSelectPerson={setSelectedId}
