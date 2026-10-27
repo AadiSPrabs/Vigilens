@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { clientToNormalised, polygonArea, selfIntersects } from '../lib/geometry'
 import { saveZones, loadZones } from '../lib/storage'
 import { samples } from '../fixtures'
+import { contractSample } from '../fixtures/contract'
 import { canAnalyse } from '../lib/canAnalyse'
 import { zonesEqual } from '../lib/geometry'
 import { preCheckFile } from '../lib/validation'
@@ -21,6 +22,7 @@ export default function UploadZoneEditor({
   const [fileError, setFileError] = useState(null)
   const [zoneError, setZoneError] = useState(null)
   const lastPointRef = useRef(null)
+  const isBackendMode = (import.meta.env.VITE_AUDIT_MODE || 'fixture') === 'backend'
 
   useEffect(() => {
     if (zones && zones.length > 0 && runWithoutZones) {
@@ -46,9 +48,7 @@ export default function UploadZoneEditor({
       setFileError(check.message)
       return
     }
-    // Bake EXIF orientation
     const processedFile = await bakeOrientation(file)
-    // Ensure correct type
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(processedFile.type)) {
       setFileError('Invalid file type')
       return
@@ -76,7 +76,9 @@ export default function UploadZoneEditor({
     fetch(s.imageSrc)
       .then(r => r.blob())
       .then(blob => {
-        const file = new File([blob], s.id + '.png', { type: 'image/png' })
+        // Use original bytes with explicit correct type
+        const type = s.id === 'contract-test' ? 'image/png' : (blob.type || 'image/png')
+        const file = new File([blob], s.id + '.png', { type })
         setImage(file)
         setZones(s.presetZones.map(z => ({ ...z, points: z.points.map(p => ({...p})) })))
         setCurrentPoints([])
@@ -88,13 +90,11 @@ export default function UploadZoneEditor({
     if (!drawing || !imgRef.current) return
     const norm = clientToNormalised(e, imgRef.current)
     if (!norm) return
-    // Ignore click within 0.002 of previous point
     if (lastPointRef.current) {
       const dx = norm.x - lastPointRef.current.x
       const dy = norm.y - lastPointRef.current.y
       if (Math.sqrt(dx*dx + dy*dy) < 0.002) return
     }
-    // Reject repeated vertex
     if (currentPoints.some(p => Math.abs(p.x-norm.x)<1e-9 && Math.abs(p.y-norm.y)<1e-9)) return
     lastPointRef.current = norm
     setCurrentPoints([...currentPoints, norm])
@@ -114,7 +114,6 @@ export default function UploadZoneEditor({
       setZoneError('Too many points per polygon. Maximum is 100.')
       return
     }
-    // Check closing repeat of first point
     if (currentPoints.length > 0 && currentPoints.some((p,i) => i>0 && Math.abs(p.x-currentPoints[0].x)<1e-9 && Math.abs(p.y-currentPoints[0].y)<1e-9)) {
       setZoneError('Duplicate/closing vertex not allowed')
       return
@@ -127,7 +126,6 @@ export default function UploadZoneEditor({
       setZoneError('Self-intersecting polygon is not allowed')
       return
     }
-    // Check touching edges (simple check - any shared edge)
     if (zoneName.length < 1 || zoneName.length > 200) {
       setZoneError('Zone name must be 1-200 chars')
       return
@@ -203,6 +201,7 @@ export default function UploadZoneEditor({
   }
 
   const canRun = canAnalyse({ image, zones, runWithoutZones, sample }) && !loading
+  const displaySamples = isBackendMode ? [...samples, contractSample] : samples
 
   return (
     <div className="card">
@@ -210,13 +209,13 @@ export default function UploadZoneEditor({
       
       <div className="sample-picker">
         <span>Try a sample:</span>
-        {samples.map(s => (
+        {displaySamples.map(s => (
           <button 
             key={s.id}
             className={`sample-btn ${sample?.id === s.id ? 'active' : ''}`}
             onClick={() => handleSampleSelect(s)}
           >
-            {s.id}
+            {s.id === 'contract-test' ? 'Contract test (backend pairing)' : s.id}
           </button>
         ))}
       </div>

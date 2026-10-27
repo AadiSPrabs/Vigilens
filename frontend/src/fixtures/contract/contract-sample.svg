@@ -1,0 +1,28 @@
+<svg width="1280" height="720" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1280" height="720" fill="#dfe7ed"/>
+  <rect y="500" width="1280" height="220" fill="#8b7355"/>
+  <text x="10" y="30" font-family="Arial, sans-serif" font-size="20" fill="#1e3a8a">SYNTHETIC - contract test</text>
+  <!-- person-1 x 0.30-0.45 y 0.30-0.70, no helmet, vest on -->
+  <ellipse cx="480" cy="356" rx="30" ry="35" fill="#d4a574"/>
+  <rect x="455" y="391" width="50" height="80" rx="10" fill="#2563eb"/>
+  <rect x="455" y="391" width="50" height="40" rx="8" fill="#f59e0b"/>
+  <ellipse cx="480" cy="318" rx="22" ry="28" fill="#8b4513"/>
+  <!-- person-2 x 0.70-0.82 y 0.30-0.70, helmet and vest on -->
+  <ellipse cx="972" cy="356" rx="28" ry="33" fill="#c68642"/>
+  <rect x="950" y="389" width="44" height="75" rx="10" fill="#16a34a"/>
+  <rect x="950" y="389" width="44" height="40" rx="8" fill="#f59e0b"/>
+  <ellipse cx="972" cy="308" rx="26" ry="16" fill="#fbbf24"/>
+  <rect x="946" y="308" width="52" height="7" rx="3.5" fill="#fbbf24"/>
+  <!-- person-3 x 0.15-0.25 y 0.35-0.65, helmet on, vest partly hidden -->
+  <ellipse cx="256" cy="360" rx="26" ry="31" fill="#b8860b"/>
+  <rect x="236" y="391" width="40" height="70" rx="10" fill="#7c3aed"/>
+  <rect x="236" y="391" width="25" height="30" rx="8" fill="#f59e0b"/>
+  <ellipse cx="256" cy="316" rx="24" ry="14" fill="#fbbf24"/>
+  <rect x="232" y="316" width="48" height="6" rx="3" fill="#fbbf24"/>
+  <!-- person-4 x 0.50-0.58 y 0.10-0.40, helmet and vest on -->
+  <ellipse cx="691" cy="180" rx="24" ry="29" fill="#a0522d"/>
+  <rect x="673" y="209" width="36" height="65" rx="10" fill="#dc2626"/>
+  <rect x="673" y="209" width="36" height="35" rx="8" fill="#f59e0b"/>
+  <ellipse cx="691" cy="138" rx="22" ry="13" fill="#fbbf24"/>
+  <rect x="669" y="138" width="44" height="6" rx="3" fill="#fbbf24"/>
+</svg>

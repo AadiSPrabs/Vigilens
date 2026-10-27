@@ -27,13 +27,14 @@ function isValidNumber(n) {
   return typeof n === 'number' && !isNaN(n) && isFinite(n)
 }
 
-export function validateAudit(audit) {
+export function validateAudit(audit, options = {}) {
+  const { mode = 'fixture' } = options
   if (!audit || typeof audit !== 'object') {
     throw new Error('Invalid audit: must be an object')
   }
   const allowedSchemas = ['0.2', '0.2-local-draft']
   if (!allowedSchemas.includes(audit.schema_version)) {
-    throw new Error('Invalid audit: unsupported schema_version')
+    throw new Error('Unsupported schema version')
   }
   if (!audit.audit_id) throw new Error('Invalid audit: missing audit_id')
   if (!audit.image || typeof audit.image !== 'object') throw new Error('Invalid audit: missing image')
@@ -97,6 +98,11 @@ export function validateAudit(audit) {
     }
     if (Array.isArray(person.findings)) {
       for (const finding of person.findings) {
+        if (mode === 'backend') {
+          if (!finding.id || typeof finding.id !== 'string' || finding.id === '') {
+            throw new Error('Invalid audit: missing finding id in backend mode')
+          }
+        }
         if (finding.id) {
           if (findingIds.has(finding.id)) throw new Error('Invalid audit: duplicate finding id')
           findingIds.add(finding.id)
@@ -153,7 +159,7 @@ export async function analyzeImage({ file, zones, sampleId }, options = {}) {
     const fixtures = await loadFixtures()
     if (fixtures[sampleId]) {
       const audit = fixtures[sampleId]
-      validateAudit(audit)
+      validateAudit(audit, { mode: 'fixture' })
       return { audit, snapshot }
     }
     
@@ -190,7 +196,6 @@ export async function analyzeImage({ file, zones, sampleId }, options = {}) {
           if (e.message && e.message.includes('FIXTURE')) throw e
         }
       }
-      // Could be FIXTURE_NOT_CONFIGURED or LOCAL_CACHE_FULL
       throw new Error('Service unavailable')
     }
     if (response.status === 429) {
@@ -243,7 +248,7 @@ export async function analyzeImage({ file, zones, sampleId }, options = {}) {
     }
     
     const audit = await response.json()
-    validateAudit(audit)
+    validateAudit(audit, { mode: 'backend' })
     return { audit, snapshot, idempotencyKey: key }
   } catch (err) {
     if (err.name === 'AbortError' || err === 'timeout') {
