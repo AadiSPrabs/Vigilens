@@ -259,13 +259,14 @@ export default function UploadZoneEditor({
       {image && (
         <div className="zone-editor">
           <p style={{ fontSize: '0.8rem', color: 'var(--medium)' }}>Preview only, not evidence</p>
-          <div className="zone-canvas-wrapper">
-            <img 
-              ref={imgRef}
-              src={URL.createObjectURL(image)} 
-              alt="Site image for zone drawing"
-              onClick={handleImageClick}
-            />
+          <div className="canvas-frame">
+            <div className="zone-canvas-wrapper">
+              <img 
+                ref={imgRef}
+                src={URL.createObjectURL(image)} 
+                alt="Site image for zone drawing"
+                onClick={handleImageClick}
+              />
             <svg 
               className={`zone-svg ${drawing ? 'drawing' : ''}`}
               viewBox="0 0 1 1" 
@@ -326,9 +327,10 @@ export default function UploadZoneEditor({
                 <circle cx={centerPoint.x} cy={centerPoint.y} r="0.004" fill="#fbbf24" stroke="#000" strokeWidth="0.001" />
               )}
             </svg>
+            </div>
           </div>
 
-          <div className="controls">
+          <div className="controls zone-controls">
             <button className="btn btn-secondary" onClick={() => { setDrawing(!drawing); setCurrentPoints([]); lastPointRef.current = null; setZoneError(null); setKeyboardMode(false) }}>
               {drawing ? 'Cancel Drawing' : 'Draw Zone'}
             </button>

@@ -5,6 +5,7 @@ import FindingsList from './components/FindingsList'
 import HazardLog from './components/HazardLog'
 import Banner from './components/Banner'
 import { analyzeImage, checkHealth } from './api/auditClient'
+import { resolveEvidence } from './lib/evidence'
 
 function App() {
   const [image, setImage] = useState(null)
@@ -25,6 +26,7 @@ function App() {
   const [healthBanner, setHealthBanner] = useState(null)
   const [uploadedNaturalSize, setUploadedNaturalSize] = useState(null)
   const [announce, setAnnounce] = useState('')
+  const [activeTab, setActiveTab] = useState('findings')
 
   const isFixtureMode = (import.meta.env.VITE_AUDIT_MODE || 'fixture') === 'fixture'
   const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
@@ -128,17 +130,28 @@ function App() {
     }
   }
 
+  const handlePrint = () => {
+    if (typeof window !== 'undefined') window.print()
+  }
+
   const showFixtureBanner = !!sample && !!audit && isFixtureMode
-  const evidenceExportAllowed = audit && audit.evidence_export_allowed === true && audit.source !== 'fixture'
+  const evidence = audit ? resolveEvidence(audit) : null
+  const evidenceUnavailable = !!audit && !!evidence && !evidence.ok
+  const showAuditImage = !!audit && !loading && !!evidence?.ok
+  const allFindings = audit && Array.isArray(audit.persons)
+    ? audit.persons.flatMap(person => Array.isArray(person.findings) ? person.findings : [])
+    : []
+  const totalFindings = allFindings.length
+  const criticalFindings = allFindings.filter(finding => finding.kind !== 'uncertainty' && finding.severity === 'Critical').length
 
   return (
     <div className="app">
       <header className="topbar">
         <h1>Vigilens</h1>
+        <Banner fromFixture={showFixtureBanner} fixtureNotice={audit?.fixture_notice} />
         <span className="mode-badge">Mode: {isFixtureMode ? 'fixture' : 'backend'}</span>
       </header>
-      {healthBanner && <div className="banner" style={{ background: '#f87171', color: '#7f1d1d' }}>{healthBanner}</div>}
-      <Banner fromFixture={showFixtureBanner} fixtureNotice={audit?.fixture_notice} />
+      {healthBanner && <div className="banner banner-health" style={{ background: '#f87171', color: '#7f1d1d' }}>{healthBanner}</div>}
       <div aria-live="polite" aria-atomic="true" className="sr-only">{announce}</div>
 
       {audit && !loading && (
@@ -152,7 +165,15 @@ function App() {
       )}
       
       <main className="main">
-        <div>
+        <section className="workspace" aria-label="Image workspace">
+          {showAuditImage && (
+            <AuditImage 
+              audit={audit}
+              selectedId={selectedId}
+              onSelectPerson={setSelectedId}
+              uploadedNaturalSize={uploadedNaturalSize}
+            />
+          )}
           <UploadZoneEditor
             image={image}
             setImage={setImage}
@@ -165,57 +186,113 @@ function App() {
             onAnalyse={handleAnalyse}
             loading={loading}
           />
-        </div>
-        <div>
-          {loading && (
-            <div className="card">
-              <p>Analyzing...</p>
-              {timeoutMessage && <p style={{ color: 'var(--medium)' }}>No response yet; the audit may still be running</p>}
-              <button className="btn btn-secondary" onClick={handleCancel}>Cancel</button>
-              {timeoutMessage && !requestInFlightRef.current && <button className="btn" onClick={handleTryAgain} style={{ marginLeft: '0.5rem' }}>Try again</button>}
+        </section>
+
+        <aside className="inspector" aria-label="Inspector">
+          <div className="inspector-header">
+            <div className="inspector-heading">
+              <h2 className="inspector-title">Inspector</h2>
+              {audit && !loading && (
+                <p className="inspector-summary">
+                  {totalFindings} findings <span className="summary-dot" aria-hidden="true">·</span> {criticalFindings} Critical
+                </p>
+              )}
+              {evidenceUnavailable && !loading && (
+                <span className="evidence-pill">Masked evidence unavailable</span>
+              )}
             </div>
-          )}
-          {error && (
-            <div className="card">
-              <p style={{ color: 'var(--critical)' }}>{error}</p>
-              {error !== 'Analysis cancelled' && !loading && <button className="btn" onClick={handleTryAgain}>Try again</button>}
-            </div>
-          )}
+            {audit && !loading && (
+              <button
+                type="button"
+                className="btn btn-secondary inspector-print"
+                onClick={handlePrint}
+                aria-label="Print or export PDF"
+              >
+                Print / Export PDF
+              </button>
+            )}
+          </div>
+
           {audit && !loading && (
-            <>
-              <AuditImage 
-                audit={audit}
-                selectedId={selectedId}
-                onSelectPerson={setSelectedId}
-                uploadedNaturalSize={uploadedNaturalSize}
-              />
-              <FindingsList 
-                audit={audit}
-                selectedId={selectedId}
-                onSelectPerson={setSelectedId}
-                decisions={decisions}
-                setDecisions={setDecisions}
-                filters={filters}
-                setFilters={setFilters}
-              />
-              <HazardLog 
-                audit={audit}
-                selectedId={selectedId}
-                onSelectPerson={setSelectedId}
-                decisions={decisions}
-              />
-              {showFixtureBanner && <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Evidence export disabled</p>}
-              {audit.fixture_loaded_at && <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>fixture loaded at: {audit.fixture_loaded_at}</p>}
-              {audit.created_at && !audit.fixture_loaded_at && <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Created: {audit.created_at}</p>}
-            </>
-          )}
-          {!audit && !loading && !error && (
-            <div className="card">
-              <h2>Results</h2>
-              <p style={{color: 'var(--text-muted)'}}>Run analysis to see results</p>
+            <div className="segmented" role="tablist" aria-label="Inspector views">
+              <button
+                type="button"
+                role="tab"
+                id="tab-findings"
+                aria-selected={activeTab === 'findings'}
+                aria-controls="panel-findings"
+                className={`segmented-btn ${activeTab === 'findings' ? 'active' : ''}`}
+                onClick={() => setActiveTab('findings')}
+              >
+                Findings ({totalFindings})
+              </button>
+              <button
+                type="button"
+                role="tab"
+                id="tab-log"
+                aria-selected={activeTab === 'log'}
+                aria-controls="panel-log"
+                className={`segmented-btn ${activeTab === 'log' ? 'active' : ''}`}
+                onClick={() => setActiveTab('log')}
+              >
+                Hazard Log
+              </button>
             </div>
           )}
-        </div>
+
+          <div className="inspector-body">
+            {loading && (
+              <div className="card inspector-message">
+                <p>Analyzing...</p>
+                {timeoutMessage && <p style={{ color: 'var(--medium)' }}>No response yet; the audit may still be running</p>}
+                <button className="btn btn-secondary" onClick={handleCancel}>Cancel</button>
+                {timeoutMessage && !requestInFlightRef.current && <button className="btn" onClick={handleTryAgain} style={{ marginLeft: '0.5rem' }}>Try again</button>}
+              </div>
+            )}
+            {error && (
+              <div className="card inspector-message">
+                <p style={{ color: 'var(--critical)' }}>{error}</p>
+                {error !== 'Analysis cancelled' && !loading && <button className="btn" onClick={handleTryAgain}>Try again</button>}
+              </div>
+            )}
+            {audit && !loading && (
+              <>
+                {activeTab === 'findings' ? (
+                  <div role="tabpanel" id="panel-findings" aria-labelledby="tab-findings">
+                    <FindingsList 
+                      audit={audit}
+                      selectedId={selectedId}
+                      onSelectPerson={setSelectedId}
+                      decisions={decisions}
+                      setDecisions={setDecisions}
+                      filters={filters}
+                      setFilters={setFilters}
+                      showHeader={false}
+                    />
+                  </div>
+                ) : (
+                  <div role="tabpanel" id="panel-log" aria-labelledby="tab-log">
+                    <HazardLog 
+                      audit={audit}
+                      selectedId={selectedId}
+                      onSelectPerson={setSelectedId}
+                      decisions={decisions}
+                    />
+                  </div>
+                )}
+                {showFixtureBanner && <p className="inspector-meta">Evidence export disabled</p>}
+                {audit.fixture_loaded_at && <p className="inspector-meta">fixture loaded at: {audit.fixture_loaded_at}</p>}
+                {audit.created_at && !audit.fixture_loaded_at && <p className="inspector-meta">Created: {audit.created_at}</p>}
+              </>
+            )}
+            {!audit && !loading && !error && (
+              <div className="card inspector-empty">
+                <h2>Results</h2>
+                <p>Run analysis to see results</p>
+              </div>
+            )}
+          </div>
+        </aside>
       </main>
       <div className="print-footer">
         Prototype audit for human review - not a compliance certification.

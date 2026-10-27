@@ -137,12 +137,13 @@ export default function AuditImage({ audit, selectedId, onSelectPerson, uploaded
   return (
     <div className="card">
       <h2>Audit Overlay</h2>
-      <div className="zone-canvas-wrapper">
-        <img 
-          src={evidence.src} 
-          alt="Site image with audit overlays"
-          onError={() => setImgError(true)}
-        />
+      <div className="canvas-frame">
+        <div className="zone-canvas-wrapper">
+          <img 
+            src={evidence.src} 
+            alt="Site image with audit overlays"
+            onError={() => setImgError(true)}
+          />
         <svg 
           className="zone-svg"
           viewBox="0 0 1 1" 
@@ -221,6 +222,7 @@ export default function AuditImage({ audit, selectedId, onSelectPerson, uploaded
             </g>
           )}
         </svg>
+        </div>
       </div>
     </div>
   )

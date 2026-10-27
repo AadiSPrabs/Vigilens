@@ -32,10 +32,10 @@ function getZoneLabel(audit, person, finding) {
   return 'No zone shown'
 }
 
-export default function FindingsList({ audit, selectedId, onSelectPerson, decisions, setDecisions, filters, setFilters }) {
+export default function FindingsList({ audit, selectedId, onSelectPerson, decisions, setDecisions, filters, setFilters, showHeader = true }) {
+  const [expanded, setExpanded] = useState({})
   if (!audit) return null
   const handlePrint = () => { if (typeof window !== 'undefined') window.print() }
-  const [expanded, setExpanded] = useState({})
   
   const toggleExpand = (key) => {
     setExpanded(prev => ({ ...prev, [key]: !prev[key] }))
@@ -47,11 +47,19 @@ export default function FindingsList({ audit, selectedId, onSelectPerson, decisi
     if (value === 'absent') return 'Absent'
     return value
   }
+
+  const printAction = showHeader ? (
+    <div className="findings-print">
+      <button type="button" className="btn btn-secondary" onClick={handlePrint} aria-label="Print or export PDF">
+        Print / Export PDF
+      </button>
+    </div>
+  ) : null
   
   if (!Array.isArray(audit.persons) || audit.persons.length === 0) {
     return (
       <>
-        {audit && <div style={{marginBottom:'12px'}}><button type="button" onClick={handlePrint} aria-label="Print or export PDF">Print / Export PDF</button></div>}
+        {printAction}
         <div className="card">
           <h2>Findings</h2>
           <p style={{ color: 'var(--critical)' }}>No people detected; not a safety clearance.</p>
@@ -63,7 +71,7 @@ export default function FindingsList({ audit, selectedId, onSelectPerson, decisi
   if (!Array.isArray(audit.zones) || audit.zones.length === 0) {
     return (
       <>
-        {audit && <div style={{marginBottom:'12px'}}><button type="button" onClick={handlePrint} aria-label="Print or export PDF">Print / Export PDF</button></div>}
+        {printAction}
         <div className="card">
           <h2>Findings</h2>
           <p style={{ color: 'var(--medium)' }}>No zones were checked; this is not proof the area is safe.</p>
@@ -110,7 +118,7 @@ export default function FindingsList({ audit, selectedId, onSelectPerson, decisi
   if (allFindings.length === 0) {
     return (
       <>
-        {audit && <div style={{marginBottom:'12px'}}><button type="button" onClick={handlePrint} aria-label="Print or export PDF">Print / Export PDF</button></div>}
+        {printAction}
         <div className="card">
           <h2>Findings</h2>
           <p style={{ color: 'var(--success)' }} title="Not a safety clearance">No listed violations</p>
@@ -127,13 +135,13 @@ export default function FindingsList({ audit, selectedId, onSelectPerson, decisi
   
   return (
     <>
-      {audit && <div style={{marginBottom:'12px'}}><button type="button" onClick={handlePrint} aria-label="Print or export PDF">Print / Export PDF</button></div>}
-      <div className="card">
-        <h2>Findings ({allFindings.length})</h2>
-      <p style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+      {printAction}
+      <div className="card findings-card">
+        {showHeader && <h2>Findings ({allFindings.length})</h2>}
+      <p className="findings-summary">
         {violationCount} findings - {criticalCount} Critical - {needsReviewCount} Needs Human Review
       </p>
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+      <div className="findings-filters">
         <select value={filters?.severity || 'all'} onChange={(e) => setFilters && setFilters({...filters, severity: e.target.value})}>
           <option value="all">All Severities</option>
           <option value="Critical">Critical</option>
@@ -146,7 +154,7 @@ export default function FindingsList({ audit, selectedId, onSelectPerson, decisi
           {zones.map(z => <option key={z} value={z}>{z}</option>)}
         </select>
       </div>
-      <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
+      <div className="findings-scroll">
         {filteredFindings.map(({ person, finding, pIdx, fIdx, key }) => {
           const zoneName = getZoneLabel(audit, person, finding)
           const isSelected = selectedId === person.id
