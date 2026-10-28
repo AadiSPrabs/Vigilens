@@ -33,7 +33,7 @@ class Ledger:
         with self._connection() as c:
             version=c.execute('PRAGMA user_version').fetchone()[0]
             if version>1:raise ValueError('Journal schema is newer than this backend; do not downgrade')
-            c.execute('PRAGMA journal_mode=WAL')
+            self._enable_wal(c)
         with self._tx() as c:
             if c.execute('PRAGMA user_version').fetchone()[0]>1:raise ValueError('Journal schema is newer than this backend')
             c.execute('''CREATE TABLE IF NOT EXISTS jobs(
@@ -51,6 +51,22 @@ class Ledger:
                 seq INTEGER PRIMARY KEY AUTOINCREMENT,job_id TEXT NOT NULL,
                 occurred REAL NOT NULL, old_state TEXT,new_state TEXT NOT NULL,reason TEXT NOT NULL)''')
             c.execute('PRAGMA user_version=1')
+    @staticmethod
+    def _enable_wal(c, *, timeout=10, clock=time.monotonic, pause=time.sleep):
+        # SQLite may bypass busy_timeout while changing journal mode concurrently.
+        # Retry only local BUSY/LOCKED setup, never a job or external call.
+        deadline=clock()+timeout
+        while True:
+            try:
+                row=c.execute('PRAGMA journal_mode=WAL').fetchone()
+                if not row or row[0].lower()!='wal':raise ValueError('WAL journal mode required')
+                return
+            except sqlite3.OperationalError as e:
+                code=getattr(e,'sqlite_errorcode',None)
+                busy=((code&255)in (5,6))if code is not None else str(e)in ('database is locked','database table is locked','database schema is locked','database is busy')
+                if not busy or clock()>=deadline:raise
+                pause(min(.025,max(0,deadline-clock())))
+
     @contextmanager
     def _connection(self):
         c=sqlite3.connect(self.path,timeout=10,isolation_level=None)

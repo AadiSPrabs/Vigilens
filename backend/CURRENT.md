@@ -66,3 +66,6 @@ SQLite uses private0600 files, rejects file symlinks/broad-readable existing fil
 - TEST-RESULTS.txt, DEMO-RESULTS.txt, SOCKET-SMOKE-RESULTS.txt: actual local run outputs, not real-model validation.
 
 Official sources used for current adapter boundaries are listed in OFFLINE-PIPELINE.md. Account entitlement, price, latency, accuracy and final provider behavior remain unverified without separately authorized live work.
+
+## Private fresh-review integration
+`app.create_app` supports explicitly mounted private fresh-review service; default fixture/job entry does not mount it. See FRESH-REVIEW.md for routes, configuration, synthetic loopback proof and limits. Existing /audit and fixture jobs are unchanged. No private records or real-source approval are included.

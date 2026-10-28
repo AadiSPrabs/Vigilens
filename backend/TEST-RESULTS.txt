@@ -1,12 +1,8 @@
-........................................................................ [ 24%]
-........................................................................ [ 48%]
-........................................................................ [ 73%]
-........................................................................ [ 97%]
-......                                                                   [100%]
-=============================== warnings summary ===============================
-../../tmp/vigilens-final-clean-env/lib/python3.10/site-packages/fastapi/testclient.py:1
-  /tmp/vigilens-final-clean-env/lib/python3.10/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
-    from starlette.testclient import TestClient as TestClient  # noqa
+Actual backend integration verification, 2026-10-28 IST
 
--- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-294 passed, 1 warning in 2.01s
+362 passed, 12 deprecation warnings. Python compileall and pytest via scripts/check.sh.
+Includes previous fixture/backend checks, strict fresh orchestration and route tests, browser-origin preflight, explicit private mounting, per-app token/display/service isolation, and same-aggregate-journal derivative tombstones.
+
+Both scripts/socket_smoke.py and scripts/fresh_socket_smoke.py passed over actual loopback HTTP. Fresh proof uses generated pixels, official SAM parser and synthetic provider replies: two simulated dispatches, repeat zero, unauthorized403, private report200, exportfalse. Zero external provider calls. Not model accuracy, live fresh-image compatibility, privacy or UI proof.
+
+Warnings are FastAPI/Starlette TestClient-httpx migration and Pillow Image.getdata deprecation, not test failures. No new dependencies.

@@ -11,6 +11,10 @@ async def parse_sam_image_text(text,frame,*,wire_completed):
     frame.validate()
     if wire_completed is not True:fail('SEGMENTATION_INCOMPLETE','Require confirmed completed saved output; no partial decode.',422)
     if not isinstance(text,str) or len(text.encode('utf-8'))>256_000:fail('SAM_TEXT_LIMIT','Saved SAM text exceeds offline limit.',422)
+    # Live SAM output may terminate its single image record with one line ending.
+    # Remove only that terminator, never internal whitespace or additional frames.
+    if text.endswith('\r\n'):text=text[:-2]
+    elif text.endswith('\n'):text=text[:-1]
     # Quota/identity preflight ONLY, not a replacement for official grammar parsing.
     if text:
         if '\n' in text or '\r' in text or not text.startswith('<0f>'):fail('SAM_IMAGE_FRAME_INVALID','Only a single image frame is accepted.',422)

@@ -28,3 +28,12 @@ def test_parser_unexpected_raw_text_rejected():
 
 def test_incomplete_source_not_relabelled_complete():
  with pytest.raises(AuditError):asyncio.run(parse_sam_image_text(TEXT,F,wire_completed=False))
+
+@pytest.mark.parametrize('ending',['\n','\r\n'])
+def test_one_terminal_line_ending_preserves_geometry(ending):
+ a=parse();b=parse(TEXT+ending)
+ assert a['objects'][0]['box_half_open']==b['objects'][0]['box_half_open']
+ assert a['objects'][0]['mask'].tobytes()==b['objects'][0]['mask'].tobytes()
+@pytest.mark.parametrize('suffix',['\n\n','\r','\n'+TEXT,'\r\n'+TEXT.replace('<0f>','<1f>')])
+def test_no_blank_extra_records_or_multiframe_normalization(suffix):
+ with pytest.raises(AuditError):parse(TEXT+suffix)

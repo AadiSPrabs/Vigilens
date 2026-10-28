@@ -69,12 +69,12 @@ def load_manifest():
     path=os.getenv('VIGILENS_FIXTURE_MANIFEST')
     return json.loads(Path(path).read_text()) if path else None
 
-def create_app(manifest=None):
+def create_app(manifest=None,*,fresh_service=None,fresh_token=None):
     service=FixtureService(manifest)
     app=FastAPI(title='Vigilens local fixture backend',version='0.2-local-draft')
     app.state.service=service
     app.add_middleware(CORSMiddleware,allow_origins=['http://localhost:5173','http://127.0.0.1:5173'],
-                       allow_methods=['POST','GET','OPTIONS'],allow_headers=['Content-Type','Idempotency-Key'])
+                       allow_methods=['POST','GET','OPTIONS'],allow_headers=['Content-Type','Idempotency-Key','X-Vigilens-Local-Access','X-Vigilens-Display-Session','Authorization'])
     @app.exception_handler(AuditError)
     async def audit_error(_,e):
         return JSONResponse(status_code=e.status,content={'error':{'code':e.code,'message':e.message}})
@@ -104,6 +104,8 @@ def create_app(manifest=None):
     @app.get('/evidence/{audit_id}.png')
     def evidence(audit_id:str):
         fail('EVIDENCE_UNAVAILABLE','Fixture API never serves real or placeholder audit evidence.',404)
+    from fresh_review.install import install
+    if fresh_service is not None:install(app,fresh_service,token=fresh_token)
     return app
 
 app=create_app(load_manifest())

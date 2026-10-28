@@ -71,3 +71,32 @@ def test_reconciliation_payload_bound_preserves_uncertain(tmp_path):
  l.clock=lambda:10**10;l.recover_expired()
  with pytest.raises(ValueError):l.reconcile_local_late_result(j,{'source':'mock','data':'x'*300},'local review')
  assert l.get(j)['state']=='needs_review'
+
+def test_wal_setup_retries_only_bounded_local_busy():
+ now=[0.];calls=[]
+ class Cursor:
+  def fetchone(self):return ('wal',)
+ class Connection:
+  def execute(self,sql):
+   calls.append(sql)
+   if len(calls)==1:
+    error=sqlite3.OperationalError('database is locked');error.sqlite_errorcode=5;raise error
+   return Cursor()
+ Ledger._enable_wal(Connection(),timeout=.1,clock=lambda:now[0],pause=lambda n:now.__setitem__(0,now[0]+n))
+ assert len(calls)==2 and now[0]>0
+
+@pytest.mark.parametrize('code',[5,10])
+def test_wal_setup_busy_deadline_or_other_error_propagates(code):
+ now=[0.];calls=[]
+ class Connection:
+  def execute(self,sql):
+   calls.append(sql);error=sqlite3.OperationalError('local setup failure');error.sqlite_errorcode=code;raise error
+ with pytest.raises(sqlite3.OperationalError):Ledger._enable_wal(Connection(),timeout=.05,clock=lambda:now[0],pause=lambda n:now.__setitem__(0,now[0]+n))
+ assert len(calls)==(3 if code==5 else 1)
+
+def test_wal_setup_older_python_busy_message_is_bounded():
+ now=[0.];calls=[]
+ class Connection:
+  def execute(self,sql):calls.append(sql);raise sqlite3.OperationalError('database is locked')
+ with pytest.raises(sqlite3.OperationalError):Ledger._enable_wal(Connection(),timeout=.05,clock=lambda:now[0],pause=lambda n:now.__setitem__(0,now[0]+n))
+ assert len(calls)==3

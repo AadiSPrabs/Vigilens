@@ -4,3 +4,10 @@ __pycache__/
 *.sqlite
 *.sqlite-*
 .env
+
+.vigilens-private/
+*-reply.bin
+*-request.json
+*-source.png
+*approval-private*.json
+*carry-private*.json
