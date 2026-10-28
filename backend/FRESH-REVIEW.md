@@ -4,7 +4,7 @@ The actual `app.create_app` factory supports a separate private fresh-review ser
 
 ## Default state
 
-- Provider transport is disabled. No API key or network provider adapter is in this change.
+- Default factory transport stays disabled. Explicit MetaTransport and run_private.py support a private live configuration; no API key or live approval is shipped.
 - Source approval file is empty. No real image permission is inferred.
 - A trusted private accounting checkpoint path/hash is required before a job can reserve credits. No actual ledger, source image, private response or account credential is shipped.
 - The default fixture app and `run_local.py` do not mount fresh/display routes. Use `create_app(fresh_service=service,fresh_token=token)` to opt in. The token is captured per app, not reread from global environment on each request.
@@ -51,3 +51,17 @@ Private pipeline and display session state are per application instance. Sharing
 Browser-origin preflight permits the exact access/session headers for localhost:5173 and127.0.0.1:5173 only; approved OPTIONS passes CORS without performing work. Actual multipart requests still require the private token. Unapproved origins fail CORS, which is not a substitute for token authentication.
 
 Created derivative pixel identities persist as tombstones in the SAME configured aggregate journal. Any app instance/restart using that journal rejects those pixels before approval or provider dispatch, even if an approval entry mistakenly names them. No global image registry is created. A different independent journal cannot discover those tombstones: one aggregate MUST use one journal, and source approval review must exclude derivatives from other workspaces. Cross-independent-store protection is not claimed.
+
+## Explicit live startup
+
+    python run_private.py --config /absolute/private/runtime.json --port 8001
+
+This entry binds127.0.0.1 only,disables access logging,and validates private files before serving. Config is0600with exact keys `version:1`, `journal`, `carry_path`, `carry_sha256`, `approval_path`, `approval_sha256`, `key_file`, `access_token_file`, `execution_scope:"private_provider_processing"`. All paths absolute, journal parent0700existing, referenced secret/carry/approval files0600. Never commit this file or its referenced data. Startup does not dispatch or create a job. Runtime examples must not reset actual spending: carry must reconcile every previous paid source/reservation.
+
+MetaTransport posts only to https://api.meta.ai/v1/responses, blocks redirects, uses a90second timeout and bounded response bytes, makes exactly one attempt and never retries HTTP/network failures. Key is read from privatefile at dispatch,never returned through API. Requests are canonicalized by FreshPipeline before transport; Standard muse-spark-1.3/SAM3.1,storefalse,no tools/background. Current pricing/model checks: https://dev.meta.ai/docs/pricing-rate-limits , https://dev.meta.ai/docs/models , https://dev.meta.ai/docs/sam/segmenting , https://dev.meta.ai/docs/protocols/responses . Before future use recheck rates/model limits;512outputcap includes reasoning,conservative reservation unchanged.
+
+### Private real-provider qualification (2026-10-28)
+
+The explicit `run_private.py` path was qualified on loopback HTTP with one separately approved private test image: one SAM call and one person PPE call completed. A same-source repeated upload and a new-process status read each dispatched zero calls. Request/response, crop, mask and cost associations were checked from the retained private journal. Exact-source face-only display treatment and head/torso evidence checks produced a private report. Boots were not visible, so contact remained unconfirmed. Export remained disabled and privacy/accuracy remained not validated. This is a single development qualification, not a production or accuracy benchmark. Source permissions, keys, image, raw replies, journal, accounting identifiers and access token are deliberately absent from this repository.
+
+The full local suite passed 376 checks (12 deprecation warnings). Network timeout/oversize/status failure and uncertain-reservation/restart behavior use controlled synthetic tests, not additional paid failure calls.
