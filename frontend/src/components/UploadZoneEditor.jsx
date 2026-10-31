@@ -237,16 +237,44 @@ export default function UploadZoneEditor({
         <h2>Upload & Zone Editor</h2>
         <span className="panel-hint">Zones are operator-drawn</span>
       </div>
-      
-      <div className="sample-picker">
-        <span>Try a sample:</span>
+
+      <div className="apple-toolbar">
+        <SegmentedControls
+          drawing={drawing}
+          setDrawing={setDrawing}
+          setCurrentPoints={setCurrentPoints}
+          lastPointRef={lastPointRef}
+          setZoneError={setZoneError}
+          setKeyboardMode={setKeyboardMode}
+        />
+        <label className="checkbox-row run-without-zones">
+          <input 
+            type="checkbox" 
+            checked={runWithoutZones}
+            onChange={(e) => setRunWithoutZones(e.target.checked)}
+          />
+          Run without zones
+        </label>
         {displaySamples.map(s => (
           <button 
             key={s.id}
-            className={`sample-btn ${sample?.id === s.id ? 'active' : ''}`}
+            className={`sample-btn apple-sample-btn ${sample?.id === s.id ? 'active' : ''}`}
             onClick={() => handleSampleSelect(s)}
           >
-            {s.id === 'contract-test' ? 'Contract test (backend pairing)' : s.id}
+            {s.id}
+          </button>
+        ))}
+      </div>
+
+      <div className="sample-picker compact">
+        <span>Sample:</span>
+        {displaySamples.map(s => (
+          <button 
+            key={s.id}
+            className={`sample-btn compact__btn ${sample?.id === s.id ? 'active' : ''}`}
+            onClick={() => handleSampleSelect(s)}
+          >
+            {s.id}
           </button>
         ))}
       </div>
@@ -257,7 +285,7 @@ export default function UploadZoneEditor({
         onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
         onDragLeave={() => setDragOver(false)}
       >
-        <p>Drag and drop an image here, or</p>
+        <p>Drop image here</p>
         <input 
           type="file" 
           accept="image/jpeg,image/png,image/webp"
@@ -330,23 +358,21 @@ export default function UploadZoneEditor({
           </div>
 
           <div className="controls zone-controls">
-            <div className="toolbar-group">
-              <button
-                className="btn btn-secondary"
-                onClick={() => { setDrawing(!drawing); setCurrentPoints([]); lastPointRef.current = null; setZoneError(null); setKeyboardMode(false) }}
-              >
-                {drawing ? 'Cancel drawing' : 'Draw zone'}
-              </button>
-            </div>
-            {drawing && (
-              <div className="toolbar-group">
-                <button className="btn btn-secondary" onClick={undoPoint}>Undo</button>
-                <button className="btn btn-secondary" onClick={clearPoints}>Clear</button>
-                <button className="btn btn-tonal" onClick={finishZone}>Finish zone</button>
-                <button className="btn btn-secondary" onClick={() => setKeyboardMode(!keyboardMode)}>
-                  {keyboardMode ? 'Mouse mode' : 'Keyboard mode'}
-                </button>
-              </div>
+            <SegmentedControls
+              drawing={drawing}
+              setDrawing={setDrawing}
+              setCurrentPoints={setCurrentPoints}
+              lastPointRef={lastPointRef}
+              setZoneError={setZoneError}
+              setKeyboardMode={setKeyboardMode}
+            />
+            {drawing && keyboardMode && (
+              <KeyboardAdditions
+                drawing={drawing}
+                setKeyboardMode={setKeyboardMode}
+                handleKeyboardAddPoint={handleKeyboardAddPoint}
+                handleKeyboardNudge={handleKeyboardNudge}
+              />
             )}
           </div>
 
@@ -400,37 +426,28 @@ export default function UploadZoneEditor({
           <div className="zone-list">
             <h3>Zones</h3>
             {(zones || []).map(zone => (
-              <div key={zone.id} className="zone-item">
-                <span
-                  className={`zone-swatch ${zone.hazard ? 'zone-swatch--hazard' : 'zone-swatch--restricted'}`}
-                  aria-hidden="true"
-                />
+              <div key={zone.id} className="zone-inset-row">
                 <input
-                  className="zone-name-input"
+                  className="zone-inset-input"
                   type="text"
                   value={zone.name}
                   onChange={(e) => updateZone(zone.id, { name: e.target.value })}
                   aria-label={`Zone name ${zone.name}`}
                   maxLength={200}
                 />
-                <label className="hazard-switch">
+                <label className="zone-inset-hazard">
                   <input
                     type="checkbox"
                     checked={zone.hazard}
                     onChange={(e) => updateZone(zone.id, { hazard: e.target.checked })}
                     aria-label={`Hazard zone ${zone.name}`}
                   />
-                  <span className="hazard-switch__track" aria-hidden="true">
-                    <span className="hazard-switch__thumb" />
+                  <span className="zone-inset-hazard-track" aria-hidden="true">
+                    <span className="zone-inset-hazard-thumb" />
                   </span>
-                  <span className="hazard-switch__label">Hazard</span>
+                  <span className="zone-inset-hazard-label">Hazard</span>
                 </label>
-                <button
-                  type="button"
-                  className="icon-btn icon-btn--danger"
-                  onClick={() => deleteZone(zone.id)}
-                  aria-label={`Delete zone ${zone.name}`}
-                >
+                <button className="zone-inset-delete">
                   <TrashIcon size={16} />
                 </button>
               </div>
@@ -462,6 +479,60 @@ export default function UploadZoneEditor({
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+function SegmentedControls({ drawing, setDrawing, setCurrentPoints, lastPointRef, setZoneError, setKeyboardMode }) {
+  return (
+    <div className="segmented-controls">
+      <button
+        className={`segmented-controls__btn ${drawing ? 'segmented-controls__btn--active' : ''}`}
+        onClick={() => { setDrawing(!drawing); setCurrentPoints([]); lastPointRef.current = null; setZoneError(null); setKeyboardMode(false) }}
+        aria-label={drawing ? 'Cancel zone drawing' : 'Draw zone'}
+        type="button"
+      >
+        {drawing ? 'Cancel' : 'Draw zone'}
+      </button>
+      {drawing && (
+        <>
+          <button className="segmented-controls__btn" onClick={undoPoint}>Undo</button>
+          <button className="segmented-controls__btn" onClick={clearPoints}>Clear</button>
+          <button className="segmented-controls__btn segmented-controls__btn--tonal" onClick={finishZone}>Finish zone</button>
+        </>
+      )}
+      {drawing && (
+        <button
+          className="segmented-controls__btn"
+          onClick={() => setKeyboardMode(!keyboardMode)}
+          aria-label={keyboardMode ? 'Mouse mode' : 'Keyboard mode'}
+        >
+          {keyboardMode ? 'Mouse mode' : 'Keyboard mode'}
+        </button>
+      )}
+    </div>
+  )
+}
+
+function KeyboardAdditions({ drawing, setKeyboardMode, handleKeyboardAddPoint, handleKeyboardNudge }) {
+  return (
+    <div className="keyboard-panel">
+      <button className="btn btn-secondary" onClick={handleKeyboardAddPoint}>Add point at centre</button>
+      <div className="nudge-controls">
+        <button className="icon-btn" onClick={() => handleKeyboardNudge(0, -0.01)} aria-label="Nudge up">
+          <ChevronUpIcon size={16} />
+        </button>
+        <button className="icon-btn" onClick={() => handleKeyboardNudge(0, 0.01)} aria-label="Nudge down">
+          <ChevronDownIcon size={16} />
+        </button>
+        <button className="icon-btn" onClick={() => handleKeyboardNudge(-0.01, 0)} aria-label="Nudge left">
+          <ChevronLeftIcon size={16} />
+        </button>
+        <button className="icon-btn" onClick={() => handleKeyboardNudge(0.01, 0)} aria-label="Nudge right">
+          <ChevronRightIcon size={16} />
+        </button>
+      </div>
+      <p className="panel-hint">Use the chevrons to nudge, then add the point at centre.</p>
     </div>
   )
 }

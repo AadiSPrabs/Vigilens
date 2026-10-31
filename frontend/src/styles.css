@@ -1559,10 +1559,10 @@ input[type="file"]::file-selector-button:hover {
   display: block;
   margin: 0 0 var(--space-3);
   padding: var(--space-3);
-  background: var(--surface-sunken);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-panel);
-  box-shadow: var(--shadow-2);
+  background: rgba(18, 18, 22, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
   line-height: 0;
   text-align: center;
 }
@@ -1595,6 +1595,84 @@ input[type="file"]::file-selector-button:hover {
   letter-spacing: 0.01em;
   pointer-events: none;
   user-select: none;
+}
+
+.apple-studio-frame {
+  background: rgba(18, 18, 22, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+/* Apple primary action button */
+.apple-primary-btn {
+  background: #0a84ff;
+  color: #ffffff;
+  font-weight: 500;
+  border-radius: 9999px;
+  padding: 10px 24px;
+  font-size: var(--type-footnote);
+  line-height: var(--leading-footnote);
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+.apple-primary-btn:hover {
+  opacity: 0.9;
+}
+
+/* Glass toolbar */
+.apple-toolbar {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+  border-radius: 12px;
+  padding: 10px 16px;
+  margin: var(--space-3) 0;
+}
+
+/* Zone manager inset cards */
+.zone-inset-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.zone-inset-row:last-child {
+  border-bottom: 0;
+}
+
+.zone-inset-input {
+  flex: 1;
+  background: transparent;
+  color: #f1f5f9;
+  font-size: var(--type-footnote);
+  border: 0;
+  outline: 1px solid #0a84ff;
+  border-radius: 0;
+  padding: 0;
+}
+
+.zone-inset-input:focus {
+  outline: 1px solid #0a84ff;
+}
+
+.zone-inset-hazard {
+  margin-left: auto;
+}
+
+/* Apple trash button integrated in row */
+.zone-inset-delete {
+  flex: 0 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.zone-inset-delete .icon-btn {
+  padding: 0;
+  background: transparent;
+  border: 0;
 }
 
 .stage-frame--empty {
