@@ -1,0 +1,46 @@
+{
+  "audit_id": "contract-001",
+  "schema_version": "0.2-local-draft",
+  "ruleset_version": "0.2",
+  "source": "backend",
+  "created_at": "2026-10-27T00:00:00Z",
+  "image": { "id": "img-contract", "width": 1280, "height": 720 },
+  "zones": [
+    { "id": "zone-1", "name": "Crane Zone", "hazard": true,
+      "points": [
+        { "x": 0.1, "y": 0.2 },
+        { "x": 0.6, "y": 0.2 },
+        { "x": 0.6, "y": 0.8 },
+        { "x": 0.1, "y": 0.8 }
+      ]
+    }
+  ],
+  "persons": [
+    {
+      "id": "person-contract-1",
+      "polygon": [
+        { "x": 0.3, "y": 0.3 },
+        { "x": 0.45, "y": 0.3 },
+        { "x": 0.45, "y": 0.7 },
+        { "x": 0.3, "y": 0.7 }
+      ],
+      "helmet": "unknown",
+      "vest": "present",
+      "zone_id": null,
+      "worst_severity": null,
+      "findings": [
+        {
+          "id": "f-c1",
+          "rule_id": "PPE_UNKNOWN",
+          "kind": "uncertainty",
+          "severity": null,
+          "message": "Helmet visibility unclear in this image.",
+          "review_state": "needs_human_review",
+          "recheck_trace": ["Occlusion detected"]
+        }
+      ]
+    }
+  ],
+  "evidence_image": { "url": "./fixtures/sample3.png" },
+  "evidence_status": "no_faces"
+}
