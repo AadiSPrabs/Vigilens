@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { getSeverityStyle } from '../lib/severity'
+import SeverityBadge from './SeverityBadge'
 
 function getZoneName(audit, person, finding) {
   const zoneId = finding.zone_id !== undefined ? finding.zone_id : person.zone_id
@@ -67,51 +67,47 @@ export default function HazardLog({ audit, selectedId, onSelectPerson, decisions
   const zones = [...new Set(rows.map(r => r.zone))]
 
   return (
-    <div className="card">
+    <div className="card hazard-card">
       <h2>Hazard Log</h2>
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
-        <select value={filterSeverity} onChange={(e) => setFilterSeverity(e.target.value)}>
+      <div className="hazard-toolbar">
+        <select aria-label="Filter hazard log by severity" value={filterSeverity} onChange={(e) => setFilterSeverity(e.target.value)}>
           <option value="all">All Severities</option>
           <option value="Critical">Critical</option>
           <option value="Medium">Medium</option>
           <option value="Low">Low</option>
           <option value="uncertain">Uncertain</option>
         </select>
-        <select value={filterZone} onChange={(e) => setFilterZone(e.target.value)}>
+        <select aria-label="Filter hazard log by zone" value={filterZone} onChange={(e) => setFilterZone(e.target.value)}>
           <option value="all">All Zones</option>
           {zones.map(z => <option key={z} value={z}>{z}</option>)}
         </select>
-        <select value={filterReview} onChange={(e) => setFilterReview(e.target.value)}>
+        <select aria-label="Filter hazard log by review state" value={filterReview} onChange={(e) => setFilterReview(e.target.value)}>
           <option value="all">All Reviews</option>
           <option value="unreviewed">Unreviewed</option>
           <option value="reviewed">Reviewed</option>
           <option value="needs_human_review">Needs human review</option>
         </select>
-        <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+        <select aria-label="Sort hazard log" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
           <option value="severity">Sort by Severity</option>
         </select>
       </div>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div className="table-scroll">
+        <table className="data-table">
           <thead>
-            <tr style={{ borderBottom: '2px solid var(--border)' }}>
-              <th style={{ textAlign: 'left', padding: '0.5rem' }}>Person</th>
-              <th style={{ textAlign: 'left', padding: '0.5rem' }}>Zone</th>
-              <th style={{ textAlign: 'left', padding: '0.5rem' }}>Finding</th>
-              <th style={{ textAlign: 'left', padding: '0.5rem' }}>Severity</th>
-              <th style={{ textAlign: 'left', padding: '0.5rem' }}>Review</th>
+            <tr>
+              <th scope="col">Person</th>
+              <th scope="col">Zone</th>
+              <th scope="col">Finding</th>
+              <th scope="col">Severity</th>
+              <th scope="col">Review</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map(row => (
-              <tr 
+              <tr
                 key={row.key}
+                className={selectedId === row.personId ? 'is-selected' : undefined}
                 onClick={() => onSelectPerson(row.personId)}
-                style={{ 
-                  cursor: 'pointer',
-                  background: selectedId === row.personId ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-                  borderBottom: '1px solid var(--border)'
-                }}
                 tabIndex={0}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
@@ -120,11 +116,13 @@ export default function HazardLog({ audit, selectedId, onSelectPerson, decisions
                   }
                 }}
               >
-                <td style={{ padding: '0.5rem' }}>{row.personLabel}</td>
-                <td style={{ padding: '0.5rem' }}>{row.zone}</td>
-                <td style={{ padding: '0.5rem', fontSize: '0.875rem' }}>{row.message}</td>
-                <td style={{ padding: '0.5rem' }}>{row.kind === 'uncertainty' ? 'Uncertain' : row.severity}</td>
-                <td style={{ padding: '0.5rem' }}>{row.review === 'needs_human_review' ? 'Needs human review' : row.review === 'reviewed' ? 'Reviewed' : 'Unreviewed'}</td>
+                <td>{row.personLabel}</td>
+                <td>{row.zone}</td>
+                <td className="data-table__message">{row.message}</td>
+                <td>
+                  <SeverityBadge severity={row.severity} kind={row.kind} />
+                </td>
+                <td>{row.review === 'needs_human_review' ? 'Needs human review' : row.review === 'reviewed' ? 'Reviewed' : 'Unreviewed'}</td>
               </tr>
             ))}
           </tbody>

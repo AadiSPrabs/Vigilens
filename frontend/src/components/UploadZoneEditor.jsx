@@ -7,6 +7,14 @@ import { canAnalyse } from '../lib/canAnalyse'
 import { zonesEqual } from '../lib/geometry'
 import { preCheckFile } from '../lib/validation'
 import { bakeOrientation } from '../lib/exif'
+import ZonePatterns from './ZonePatterns'
+import {
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ChevronUpIcon,
+  TrashIcon
+} from './Icons'
 
 export default function UploadZoneEditor({ 
   image, setImage, zones, setZones, sample, setSample, 
@@ -261,104 +269,105 @@ export default function UploadZoneEditor({
 
       {image && (
         <div className="zone-editor">
-          <p className="canvas-note">Preview only, not evidence</p>
-          <div className="canvas-frame">
-            <div className="zone-canvas-wrapper">
-              <img 
+          <div className="stage-frame">
+            <div className="stage-frame__topline">
+              <span className="stage-frame__tag">Preview only, not evidence</span>
+            </div>
+            <div className="zone-canvas-wrapper" onClick={handleImageClick}>
+              <img
                 ref={imgRef}
-                src={URL.createObjectURL(image)} 
+                src={URL.createObjectURL(image)}
                 alt="Site image for zone drawing"
-                onClick={handleImageClick}
               />
-            <svg 
-              className={`zone-svg ${drawing ? 'drawing' : ''}`}
-              viewBox="0 0 1 1" 
-              preserveAspectRatio="none"
-              role="img"
-              aria-label="Zone overlay"
-            >
-              <defs>
-                <pattern
-                  id="hazard-pattern"
-                  patternUnits="userSpaceOnUse"
-                  width="0.04"
-                  height="0.04"
-                  patternTransform="rotate(45)"
-                >
-                  <rect width="0.04" height="0.04" fill="#000000" opacity="0.12" />
-                  <line x1="0" y1="0" x2="0" y2="0.04" stroke="#f59e0b" strokeWidth="0.002" opacity="0.25" />
-                  <line x1="0.02" y1="0" x2="0.02" y2="0.04" stroke="#000000" strokeWidth="0.002" opacity="0.25" />
-                </pattern>
-                <pattern
-                  id="restricted-pattern"
-                  patternUnits="userSpaceOnUse"
-                  width="0.04"
-                  height="0.04"
-                  patternTransform="rotate(45)"
-                >
-                  <rect width="0.04" height="0.04" fill="#000000" opacity="0.1" />
-                  <line x1="0" y1="0" x2="0" y2="0.04" stroke="#94a3b8" strokeWidth="0.002" opacity="0.2" />
-                  <line x1="0.02" y1="0" x2="0.02" y2="0.04" stroke="#000000" strokeWidth="0.002" opacity="0.2" />
-                </pattern>
-              </defs>
-              {(zones || []).map(zone => (
-                <polygon
-                  key={zone.id}
-                  className={`zone-polygon ${zone.hazard ? 'hazard' : ''}`}
-                  points={zone.points.map(p => `${p.x},${p.y}`).join(' ')}
-                  fill={zone.hazard ? 'url(#hazard-pattern)' : 'url(#restricted-pattern)'}
-                  stroke={zone.hazard ? '#ff334b' : '#94a3b8'}
-                  strokeWidth="0.002"
-                  strokeLinejoin="round"
-                  tabIndex={0}
-                  role="button"
-                  aria-label={`Zone ${zone.name}, ${zone.hazard ? 'hazard' : 'safe'}`}
-                />
-              ))}
-              {drawing && currentPoints.length > 0 && (
-                <g>
-                  <polyline
-                    className="zone-preview"
-                    points={currentPoints.map(p => `${p.x},${p.y}`).join(' ')}
+              <svg
+                className={`zone-svg ${drawing ? 'drawing' : ''}`}
+                viewBox="0 0 1 1"
+                preserveAspectRatio="none"
+                role="img"
+                aria-label="Zone overlay"
+              >
+                <ZonePatterns surface="editor" />
+                {(zones || []).map(zone => {
+                  const points = zone.points.map(p => `${p.x},${p.y}`).join(' ')
+                  return (
+                    <g key={zone.id}>
+                      <g aria-hidden="true">
+                        <polygon className="zone-halo zone-halo--outer" points={points} focusable="false" />
+                        <polygon className="zone-halo zone-halo--inner" points={points} focusable="false" />
+                      </g>
+                      <polygon
+                        className={`zone-polygon zone-polygon--zone ${zone.hazard ? 'hazard' : 'restricted'}`}
+                        points={points}
+                        fill={`url(#editor-${zone.hazard ? 'hazard' : 'restricted'}-pattern)`}
+                        tabIndex={0}
+                        role="button"
+                        aria-label={`Zone ${zone.name}, ${zone.hazard ? 'hazard' : 'safe'}`}
+                      />
+                    </g>
+                  )
+                })}
+                {drawing && currentPoints.length > 0 && (
+                  <g aria-hidden="true">
+                    <polyline
+                      className="zone-preview"
+                      points={currentPoints.map(p => `${p.x},${p.y}`).join(' ')}
+                    />
+                    {currentPoints.map((p, i) => (
+                      <circle key={i} className="draw-point" cx={p.x} cy={p.y} r="0.003" />
+                    ))}
+                  </g>
+                )}
+                {keyboardMode && drawing && (
+                  <circle
+                    className="draw-center"
+                    cx={centerPoint.x}
+                    cy={centerPoint.y}
+                    r="0.004"
                   />
-                  {currentPoints.map((p, i) => (
-                    <circle key={i} cx={p.x} cy={p.y} r="0.003" fill="#3b82f6" />
-                  ))}
-                </g>
-              )}
-              {keyboardMode && drawing && (
-                <circle cx={centerPoint.x} cy={centerPoint.y} r="0.004" fill="#fbbf24" stroke="#000" strokeWidth="0.001" />
-              )}
-            </svg>
+                )}
+              </svg>
             </div>
           </div>
 
           <div className="controls zone-controls">
-            <button className="btn btn-secondary" onClick={() => { setDrawing(!drawing); setCurrentPoints([]); lastPointRef.current = null; setZoneError(null); setKeyboardMode(false) }}>
-              {drawing ? 'Cancel Drawing' : 'Draw Zone'}
-            </button>
+            <div className="toolbar-group">
+              <button
+                className="btn btn-secondary"
+                onClick={() => { setDrawing(!drawing); setCurrentPoints([]); lastPointRef.current = null; setZoneError(null); setKeyboardMode(false) }}
+              >
+                {drawing ? 'Cancel drawing' : 'Draw zone'}
+              </button>
+            </div>
             {drawing && (
-              <>
-                <button className="btn btn-secondary" onClick={undoPoint}>Undo Last Point</button>
-                <button className="btn btn-secondary" onClick={clearPoints}>Clear Points</button>
-                <button className="btn" onClick={finishZone}>Finish Zone</button>
+              <div className="toolbar-group">
+                <button className="btn btn-secondary" onClick={undoPoint}>Undo</button>
+                <button className="btn btn-secondary" onClick={clearPoints}>Clear</button>
+                <button className="btn btn-tonal" onClick={finishZone}>Finish zone</button>
                 <button className="btn btn-secondary" onClick={() => setKeyboardMode(!keyboardMode)}>
-                  {keyboardMode ? 'Mouse Mode' : 'Keyboard Mode'}
+                  {keyboardMode ? 'Mouse mode' : 'Keyboard mode'}
                 </button>
-              </>
+              </div>
             )}
           </div>
 
           {keyboardMode && drawing && (
             <div className="keyboard-panel">
-              <button className="btn" onClick={handleKeyboardAddPoint}>Add point at centre</button>
+              <button className="btn btn-secondary" onClick={handleKeyboardAddPoint}>Add point at centre</button>
               <div className="nudge-controls">
-                <button onClick={() => handleKeyboardNudge(0, -0.01)} aria-label="Nudge up">↑</button>
-                <button onClick={() => handleKeyboardNudge(0, 0.01)} aria-label="Nudge down">↓</button>
-                <button onClick={() => handleKeyboardNudge(-0.01, 0)} aria-label="Nudge left">←</button>
-                <button onClick={() => handleKeyboardNudge(0.01, 0)} aria-label="Nudge right">→</button>
+                <button className="icon-btn" onClick={() => handleKeyboardNudge(0, -0.01)} aria-label="Nudge up">
+                  <ChevronUpIcon size={16} />
+                </button>
+                <button className="icon-btn" onClick={() => handleKeyboardNudge(0, 0.01)} aria-label="Nudge down">
+                  <ChevronDownIcon size={16} />
+                </button>
+                <button className="icon-btn" onClick={() => handleKeyboardNudge(-0.01, 0)} aria-label="Nudge left">
+                  <ChevronLeftIcon size={16} />
+                </button>
+                <button className="icon-btn" onClick={() => handleKeyboardNudge(0.01, 0)} aria-label="Nudge right">
+                  <ChevronRightIcon size={16} />
+                </button>
               </div>
-              <p className="panel-hint">Use arrow keys to nudge, add point at centre</p>
+              <p className="panel-hint">Use the chevrons to nudge, then add the point at centre.</p>
             </div>
           )}
 
@@ -367,17 +376,18 @@ export default function UploadZoneEditor({
           {drawing && (
             <div className="zone-draw-panel">
               <div className="draw-panel-row">
-                <input 
-                  type="text" 
-                  value={zoneName} 
+                <input
+                  type="text"
+                  value={zoneName}
                   onChange={(e) => setZoneName(e.target.value)}
                   placeholder="Zone name (required)"
+                  aria-label="New zone name"
                   maxLength={200}
                 />
                 <label className="checkbox-row">
-                  <input 
-                    type="checkbox" 
-                    checked={zoneHazard} 
+                  <input
+                    type="checkbox"
+                    checked={zoneHazard}
                     onChange={(e) => setZoneHazard(e.target.checked)}
                   />
                   Hazard zone
@@ -391,21 +401,38 @@ export default function UploadZoneEditor({
             <h3>Zones</h3>
             {(zones || []).map(zone => (
               <div key={zone.id} className="zone-item">
-                <input 
-                  type="text" 
+                <span
+                  className={`zone-swatch ${zone.hazard ? 'zone-swatch--hazard' : 'zone-swatch--restricted'}`}
+                  aria-hidden="true"
+                />
+                <input
+                  className="zone-name-input"
+                  type="text"
                   value={zone.name}
                   onChange={(e) => updateZone(zone.id, { name: e.target.value })}
+                  aria-label={`Zone name ${zone.name}`}
                   maxLength={200}
                 />
-                <label className="checkbox-row">
-                  <input 
-                    type="checkbox" 
+                <label className="hazard-switch">
+                  <input
+                    type="checkbox"
                     checked={zone.hazard}
                     onChange={(e) => updateZone(zone.id, { hazard: e.target.checked })}
+                    aria-label={`Hazard zone ${zone.name}`}
                   />
-                  Hazard
+                  <span className="hazard-switch__track" aria-hidden="true">
+                    <span className="hazard-switch__thumb" />
+                  </span>
+                  <span className="hazard-switch__label">Hazard</span>
                 </label>
-                <button className="btn btn-danger" onClick={() => deleteZone(zone.id)}>Delete</button>
+                <button
+                  type="button"
+                  className="icon-btn icon-btn--danger"
+                  onClick={() => deleteZone(zone.id)}
+                  aria-label={`Delete zone ${zone.name}`}
+                >
+                  <TrashIcon size={16} />
+                </button>
               </div>
             ))}
           </div>

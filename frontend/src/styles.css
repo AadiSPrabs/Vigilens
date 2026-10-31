@@ -81,6 +81,7 @@
 
   --overlay-halo-outer: rgba(0, 0, 0, 0.55);
   --overlay-halo-inner: rgba(255, 255, 255, 0.85);
+  --overlay-pattern-ink: rgba(0, 0, 0, 0.55);
   --overlay-zone-fill: rgba(110, 110, 115, 0.08);
   --overlay-zone-hazard-fill: rgba(215, 0, 21, 0.1);
   --overlay-zone-stroke: #6e6e73;
@@ -217,6 +218,7 @@
 
     --overlay-halo-outer: rgba(255, 255, 255, 0.6);
     --overlay-halo-inner: rgba(0, 0, 0, 0.55);
+    --overlay-pattern-ink: rgba(255, 255, 255, 0.5);
     --overlay-zone-fill: rgba(161, 161, 166, 0.1);
     --overlay-zone-hazard-fill: rgba(255, 105, 97, 0.12);
     --overlay-zone-stroke: #a1a1a6;
@@ -304,6 +306,7 @@
 
     --overlay-halo-outer: rgba(255, 255, 255, 0.6);
     --overlay-halo-inner: rgba(0, 0, 0, 0.55);
+    --overlay-pattern-ink: rgba(255, 255, 255, 0.5);
     --overlay-zone-fill: rgba(161, 161, 166, 0.1);
     --overlay-zone-hazard-fill: rgba(255, 105, 97, 0.12);
     --overlay-zone-stroke: #a1a1a6;
@@ -748,12 +751,12 @@ samp {
 }
 
 .inspector .inspector-message {
-  padding: var(--space-4) 0;
-  border-bottom: 1px solid var(--border);
+  margin: var(--space-4) 0;
 }
 
 .inspector .inspector-empty {
-  padding: var(--space-5) 0;
+  margin: var(--space-2) 0;
+  padding: var(--space-4) var(--space-4);
 }
 
 .inspector .inspector-empty > h2 {
@@ -896,6 +899,44 @@ button,
   background: var(--bg-subtle);
 }
 
+.btn-tonal {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: transparent;
+}
+
+.btn-tonal:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  color: var(--text-secondary);
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: var(--row-hover);
+  color: var(--text);
+}
+
+.icon-btn--danger {
+  color: var(--sev-critical-fg);
+}
+
+.icon-btn--danger:hover:not(:disabled) {
+  background: var(--sev-critical-bg);
+  color: var(--sev-critical-fg);
+}
+
 .btn-ghost {
   background: transparent;
   color: var(--text-secondary);
@@ -956,6 +997,7 @@ button,
 }
 
 .btn:focus-visible,
+.icon-btn:focus-visible,
 .sample-btn:focus-visible,
 .segmented-btn:focus-visible {
   outline: 2px solid var(--focus-ring);
@@ -1273,14 +1315,38 @@ input[type="file"]::file-selector-button:hover {
 .controls {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-2);
   margin-top: var(--space-2);
 }
 
-.zone-controls .btn {
-  height: 32px;
-  padding: 0 var(--space-3);
-  font-size: var(--type-caption);
+.toolbar-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+
+.toolbar-group .btn {
+  border-color: transparent;
+  background: transparent;
+}
+
+.toolbar-group .btn:hover:not(:disabled) {
+  background: var(--surface);
+}
+
+.toolbar-group .btn-tonal {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.toolbar-group .btn-tonal:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
 }
 
 .keyboard-panel,
@@ -1336,30 +1402,108 @@ input[type="file"]::file-selector-button:hover {
   border-bottom: 0;
 }
 
-.zone-item label {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  color: var(--text-tertiary);
-  font-size: var(--type-caption);
-  white-space: nowrap;
+.zone-swatch {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border: 1px solid;
+  border-radius: 4px;
 }
 
-.zone-item .btn-danger {
-  height: 32px;
-  padding: 0 var(--space-2);
+.zone-swatch--hazard {
+  background: var(--sev-critical-fill);
+  border-color: var(--sev-critical-border);
+}
+
+.zone-swatch--restricted {
+  background: var(--overlay-zone-fill);
+  border-color: var(--overlay-zone-stroke);
+}
+
+.zone-name-input {
+  flex: 1;
+  min-width: 6rem;
+  height: 40px;
+}
+
+.hazard-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  color: var(--text-tertiary);
   font-size: var(--type-caption);
+  line-height: var(--leading-caption);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.hazard-switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+  opacity: 0;
+}
+
+.hazard-switch__track {
+  display: inline-flex;
+  align-items: center;
+  width: 34px;
+  height: 20px;
+  padding: 2px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  transition: background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.hazard-switch__thumb {
+  width: 14px;
+  height: 14px;
+  background: var(--surface);
+  border-radius: 50%;
+  box-shadow: var(--shadow-1);
+  transition: transform var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+
+.hazard-switch input:checked + .hazard-switch__track {
+  background: var(--sev-critical-bg);
+  border-color: var(--sev-critical-border);
+}
+
+.hazard-switch input:checked + .hazard-switch__track .hazard-switch__thumb {
+  background: var(--sev-critical-stroke);
+  transform: translateX(14px);
+}
+
+.hazard-switch input:focus-visible + .hazard-switch__track {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.zone-item .icon-btn {
+  flex: 0 0 auto;
 }
 
 .zone-item input[type="text"],
 .zone-editor input[type="text"] {
   flex: 1;
   min-width: 6rem;
-  height: 32px;
+  height: 40px;
 }
 
 .run-without-zones {
   display: flex;
+  min-height: 40px;
   margin-top: var(--space-3);
 }
 
@@ -1392,13 +1536,17 @@ input[type="file"]::file-selector-button:hover {
 /* ==========================================================================
    Image stage
    Geometry-critical wrapper: do not add padding, border, margin, transform,
-   object-fit or clipping here. Frame styling goes on .canvas-frame only.
+   object-fit or clipping to .zone-canvas-wrapper or its img. Frame styling
+   lives on the outer .stage-frame only.
    ========================================================================== */
 
-.canvas-frame {
+.stage-frame {
+  position: relative;
   width: 100%;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
   margin: 0 0 var(--space-3);
   padding: var(--space-3);
   background: var(--surface-sunken);
@@ -1407,8 +1555,59 @@ input[type="file"]::file-selector-button:hover {
   box-shadow: var(--shadow-2);
 }
 
-.canvas-stage .canvas-frame {
+.canvas-stage .stage-frame {
   margin: 0;
+}
+
+.stage-frame__topline {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 20px;
+}
+
+.stage-frame__tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px var(--space-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--text-tertiary);
+  font-size: 11px;
+  line-height: 18px;
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.01em;
+  pointer-events: none;
+  user-select: none;
+}
+
+.stage-frame--empty {
+  min-height: 260px;
+  justify-content: center;
+  gap: var(--space-3);
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.stage-empty__icon {
+  color: var(--text-tertiary);
+  opacity: 0.7;
+}
+
+.stage-empty__text {
+  max-width: 34ch;
+  color: var(--text-secondary);
+  font-size: var(--type-footnote);
+  line-height: var(--leading-footnote);
+}
+
+.stage-block h2 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--type-headline);
+  line-height: var(--leading-headline);
+  font-weight: var(--weight-semibold);
 }
 
 .zone-canvas-wrapper {
@@ -1424,7 +1623,7 @@ input[type="file"]::file-selector-button:hover {
   height: auto;
 }
 
-.canvas-frame .zone-canvas-wrapper {
+.stage-frame .zone-canvas-wrapper {
   max-width: 100%;
 }
 
@@ -1440,12 +1639,62 @@ input[type="file"]::file-selector-button:hover {
   pointer-events: all;
 }
 
-/* Overlay strokes use screen pixels so a non-square viewBox does not
-   stretch them. Geometry is unchanged by vector-effect. */
+/* ==========================================================================
+   SVG overlays
+   Strokes use screen pixels so non-square images keep uniform outlines.
+   Halo polygons sit behind every shape and are never interactive.
+   ========================================================================== */
+
+.zone-halo,
 .zone-region,
 .zone-polygon,
-.zone-preview {
+.zone-preview,
+.draw-center {
   vector-effect: non-scaling-stroke;
+}
+
+.zone-pattern__base {
+  fill: var(--overlay-pattern-ink);
+  opacity: 0.12;
+}
+
+.zone-pattern__base--hazard {
+  opacity: 0.16;
+}
+
+.zone-pattern__line {
+  fill: none;
+  stroke-width: 0.002;
+  opacity: 0.25;
+}
+
+.zone-pattern__line--hazard {
+  stroke: var(--overlay-zone-hazard-stroke);
+}
+
+.zone-pattern__line--restricted {
+  stroke: var(--overlay-zone-stroke);
+}
+
+.zone-pattern__line--ink {
+  stroke: var(--overlay-pattern-ink);
+}
+
+.zone-halo {
+  fill: none;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.zone-halo--outer {
+  stroke: var(--overlay-halo-outer);
+  stroke-width: 6px;
+}
+
+.zone-halo--inner {
+  stroke: var(--overlay-halo-inner);
+  stroke-width: 3px;
 }
 
 .zone-region {
@@ -1455,18 +1704,14 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .zone-region.hazard {
-  fill: var(--overlay-zone-hazard-fill) !important;
-  stroke: var(--overlay-zone-hazard-stroke) !important;
+  stroke: var(--overlay-zone-hazard-stroke);
 }
 
 .zone-region.restricted {
-  fill: var(--overlay-zone-fill) !important;
-  stroke: var(--overlay-zone-stroke) !important;
+  stroke: var(--overlay-zone-stroke);
 }
 
 .zone-polygon {
-  fill: var(--overlay-zone-fill);
-  stroke: var(--overlay-zone-stroke);
   stroke-width: 1.5px;
   stroke-linejoin: round;
   pointer-events: all;
@@ -1474,8 +1719,11 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .zone-polygon.hazard {
-  fill: var(--overlay-zone-hazard-fill);
   stroke: var(--overlay-zone-hazard-stroke);
+}
+
+.zone-polygon.restricted {
+  stroke: var(--overlay-zone-stroke);
 }
 
 .zone-polygon:focus-visible {
@@ -1483,6 +1731,7 @@ input[type="file"]::file-selector-button:hover {
   stroke-width: 3px !important;
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
+  filter: drop-shadow(0 0 2px var(--focus-ring)) drop-shadow(0 0 5px var(--focus-ring));
 }
 
 .zone-preview {
@@ -1492,10 +1741,19 @@ input[type="file"]::file-selector-button:hover {
   stroke-dasharray: 6 4;
 }
 
+.draw-point {
+  fill: var(--overlay-point);
+}
+
+.draw-center {
+  fill: var(--overlay-keyboard);
+  stroke: var(--overlay-halo-outer);
+  stroke-width: 1.5px;
+}
+
 .person-outline {
   fill: var(--sev-neutral-fill);
   stroke: var(--sev-neutral-stroke);
-  stroke-width: 1.5px;
 }
 
 .person-outline--critical {
@@ -1513,6 +1771,11 @@ input[type="file"]::file-selector-button:hover {
   stroke: var(--sev-low-stroke);
 }
 
+.person-outline--uncertain {
+  fill: var(--sev-uncertain-fill);
+  stroke: var(--sev-uncertain-stroke);
+}
+
 .person-outline--no-listed {
   fill: var(--sev-no-listed-fill);
   stroke: var(--sev-no-listed-stroke);
@@ -1523,6 +1786,7 @@ input[type="file"]::file-selector-button:hover {
   stroke: var(--sev-neutral-stroke);
 }
 
+.zone-polygon.is-selected,
 .person-outline.is-selected {
   fill: var(--overlay-selected-fill);
   stroke-width: 2.5px;
@@ -1535,6 +1799,11 @@ input[type="file"]::file-selector-button:hover {
 /* ==========================================================================
    Findings inspector
    ========================================================================== */
+
+.findings-card {
+  display: flex;
+  flex-direction: column;
+}
 
 .findings-summary {
   margin: 0 0 var(--space-3);
@@ -1557,6 +1826,9 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .findings-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   overflow: visible;
 }
 
@@ -1565,19 +1837,21 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .finding-row {
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--border);
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
 }
 
-.finding-row:last-child {
-  border-bottom: 0;
+.finding-row:hover {
+  border-color: var(--border-strong);
 }
 
-.finding-row.selected {
-  padding-left: var(--space-3);
+.finding-row.is-selected {
   background: var(--row-selected);
-  border-radius: var(--radius-control);
-  box-shadow: inset 2px 0 0 var(--accent);
+  border-color: var(--accent);
 }
 
 .finding-person {
@@ -1609,6 +1883,7 @@ input[type="file"]::file-selector-button:hover {
 .finding-ppe {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-2);
   margin-top: var(--space-2);
   color: var(--text-secondary);
@@ -1616,9 +1891,46 @@ input[type="file"]::file-selector-button:hover {
   line-height: var(--leading-caption);
 }
 
-.finding-ppe strong {
-  color: var(--text);
+.ppe-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.ppe-item__label {
+  color: var(--text-tertiary);
+}
+
+.ppe-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-size: var(--type-caption);
+  line-height: var(--leading-caption);
   font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.ppe-chip--present {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ppe-chip--absent {
+  background: var(--sev-critical-bg);
+  border-color: var(--sev-critical-border);
+  color: var(--sev-critical-fg);
+}
+
+.ppe-chip--unknown {
+  background: var(--sev-uncertain-bg);
+  border-color: var(--sev-uncertain-border);
+  color: var(--sev-uncertain-fg);
+  white-space: normal;
 }
 
 .finding-meta {
@@ -1638,18 +1950,46 @@ input[type="file"]::file-selector-button:hover {
   font-family: var(--font-mono);
   font-size: 11px;
   line-height: var(--leading-caption);
+  overflow-wrap: anywhere;
 }
 
 .finding-message {
   margin: var(--space-2) 0;
   color: var(--text-secondary);
-  font-size: var(--type-footnote);
-  line-height: var(--leading-footnote);
+  font-size: var(--type-body);
+  line-height: var(--leading-body);
   overflow-wrap: anywhere;
 }
 
 .finding-recheck {
   margin-top: var(--space-2);
+}
+
+.disclosure {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 40px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--text-tertiary);
+  font-size: var(--type-caption);
+  line-height: var(--leading-caption);
+  text-align: left;
+}
+
+.disclosure:hover {
+  color: var(--text);
+}
+
+.disclosure__chevron {
+  flex: 0 0 auto;
+  transition: transform var(--duration-base) var(--ease-out);
+}
+
+.disclosure[aria-expanded="true"] .disclosure__chevron {
+  transform: rotate(180deg);
 }
 
 .finding-recheck ul {
@@ -1686,7 +2026,8 @@ input[type="file"]::file-selector-button:hover {
   cursor: pointer;
   user-select: none;
   transition: background var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out);
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
 }
 
 .review label:hover {
@@ -1706,10 +2047,9 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .review label:has(input[type="radio"]:checked) {
-  background: var(--surface);
-  border-color: var(--border);
-  color: var(--text);
-  box-shadow: var(--shadow-1);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .review label:has(input[type="radio"]:focus-visible) {
@@ -1717,17 +2057,40 @@ input[type="file"]::file-selector-button:hover {
   outline-offset: 2px;
 }
 
+.findings-footer {
+  margin-top: var(--space-3);
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: var(--leading-caption);
+}
+
 /* ==========================================================================
    Hazard log table
    ========================================================================== */
+
+.hazard-toolbar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.hazard-toolbar select {
+  width: 100%;
+  height: 32px;
+  min-width: 0;
+  font-size: var(--type-caption);
+}
 
 .table-scroll {
   width: 100%;
   overflow-x: auto;
 }
 
-table {
+.data-table {
   width: 100%;
+  min-width: 560px;
   border-collapse: collapse;
   font-family: var(--font-sans);
   font-size: var(--type-footnote);
@@ -1735,7 +2098,7 @@ table {
   font-variant-numeric: tabular-nums;
 }
 
-table thead th {
+.data-table thead th {
   position: sticky;
   top: 0;
   z-index: 1;
@@ -1751,7 +2114,7 @@ table thead th {
   white-space: nowrap;
 }
 
-table tbody td {
+.data-table tbody td {
   padding: 11px var(--space-2);
   color: var(--text-secondary);
   border: 0;
@@ -1759,30 +2122,108 @@ table tbody td {
   vertical-align: top;
 }
 
-table tbody tr {
+.data-table tbody tr {
   border: 0;
   background: transparent;
+  cursor: pointer;
   transition: background var(--duration-fast) var(--ease-out);
 }
 
-table tbody tr:hover {
+.data-table tbody tr:hover {
   background: var(--row-hover);
 }
 
-table tbody tr:focus-visible {
+.data-table tbody tr.is-selected {
+  background: var(--row-selected);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.data-table tbody tr:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: -2px;
 }
 
-/* Temporary bridge until the Hazard Log's inline style becomes a class. */
-table tbody tr[style*="rgba(59, 130, 246, 0.1)"] {
-  background: var(--row-selected) !important;
-  box-shadow: inset 2px 0 0 var(--accent);
+.data-table__message {
+  min-width: 220px;
+  color: var(--text-secondary);
 }
 
 /* ==========================================================================
    States
    ========================================================================== */
+
+.state-panel {
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-size: var(--type-footnote);
+  line-height: var(--leading-footnote);
+}
+
+.state-panel h2 {
+  margin: 0 0 var(--space-1);
+  font-size: var(--type-headline);
+  line-height: var(--leading-headline);
+  font-weight: var(--weight-semibold);
+}
+
+.state-panel p {
+  margin: 0;
+}
+
+.state-panel--danger {
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+  color: var(--danger-fg);
+}
+
+.state-panel--warning {
+  background: var(--notice-bg);
+  border-color: var(--notice-border);
+  color: var(--notice-fg);
+}
+
+.state-panel--ok {
+  background: var(--sev-no-listed-bg);
+  border-color: var(--sev-no-listed-border);
+  color: var(--sev-no-listed-fg);
+}
+
+.state-panel__verdict {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--weight-medium);
+}
+
+.loading-panel {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-4) 0;
+}
+
+.loading-panel p {
+  margin: 0;
+}
+
+.inspector-warning {
+  flex-basis: 100%;
+  color: var(--notice-fg);
+  font-size: var(--type-caption);
+  line-height: var(--leading-caption);
+}
+
+.inspector-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  flex-basis: 100%;
+  margin-top: var(--space-2);
+}
 
 .spinner {
   display: inline-block;
@@ -1908,7 +2349,7 @@ table tbody tr[style*="rgba(59, 130, 246, 0.1)"] {
     display: none;
   }
 
-  .canvas-frame {
+  .stage-frame {
     padding: var(--space-2);
   }
 
@@ -1977,6 +2418,7 @@ table tbody tr[style*="rgba(59, 130, 246, 0.1)"] {
   :root[data-theme="dark"] {
     color-scheme: light;
     --bg: #ffffff;
+    --bg-subtle: #f1f5f9;
     --surface: #ffffff;
     --surface-sunken: #f8fafc;
     --surface-raised: #ffffff;
@@ -1986,10 +2428,58 @@ table tbody tr[style*="rgba(59, 130, 246, 0.1)"] {
     --border: #cbd5e1;
     --border-strong: #94a3b8;
     --accent: #0068d9;
+    --accent-hover: #0057b8;
     --accent-contrast: #ffffff;
+    --accent-soft: #e6f0fb;
+    --focus-ring: #0068d9;
+    --row-hover: #f8fafc;
+    --row-selected: #eef4ff;
     --notice-bg: #fff7e6;
     --notice-border: #e3b341;
     --notice-fg: #6b4500;
+    --danger-bg: #fdecec;
+    --danger-border: #e5484d;
+    --danger-fg: #b42318;
+    --sev-critical-fg: #b42318;
+    --sev-critical-bg: #fdecec;
+    --sev-critical-border: #d70015;
+    --sev-critical-stroke: #d70015;
+    --sev-critical-fill: #fdecec;
+    --sev-medium-fg: #8a4b00;
+    --sev-medium-bg: #fff4e0;
+    --sev-medium-border: #b26a00;
+    --sev-medium-stroke: #b26a00;
+    --sev-medium-fill: #fff4e0;
+    --sev-low-fg: #44546a;
+    --sev-low-bg: #eef2f6;
+    --sev-low-border: #64748b;
+    --sev-low-stroke: #4a5b72;
+    --sev-low-fill: #eef2f6;
+    --sev-uncertain-fg: #5b2db3;
+    --sev-uncertain-bg: #f3eeff;
+    --sev-uncertain-border: #7c5cd6;
+    --sev-uncertain-stroke: #6e3fd1;
+    --sev-uncertain-fill: #f3eeff;
+    --sev-no-listed-fg: #146c2e;
+    --sev-no-listed-bg: #e9f7ec;
+    --sev-no-listed-border: #2e8b46;
+    --sev-no-listed-stroke: #1e7b34;
+    --sev-no-listed-fill: #e9f7ec;
+    --sev-neutral-fg: #505054;
+    --sev-neutral-bg: #f0f0f2;
+    --sev-neutral-border: #8e8e93;
+    --sev-neutral-stroke: #6e6e73;
+    --sev-neutral-fill: #f0f0f2;
+    --overlay-halo-outer: #334155;
+    --overlay-halo-inner: #ffffff;
+    --overlay-pattern-ink: #475569;
+    --overlay-zone-fill: #eef2f6;
+    --overlay-zone-hazard-fill: #fdecec;
+    --overlay-zone-stroke: #64748b;
+    --overlay-zone-hazard-stroke: #d70015;
+    --overlay-selected-fill: #dbeafe;
+    --overlay-point: #0068d9;
+    --overlay-keyboard: #b26a00;
   }
 
   html,
@@ -2029,6 +2519,9 @@ table tbody tr[style*="rgba(59, 130, 246, 0.1)"] {
   .warning,
   .findings-filters,
   .findings-print,
+  .hazard-toolbar,
+  .stage-frame__topline,
+  .stage-frame--empty,
   .inspector-meta,
   input,
   select,
@@ -2108,7 +2601,7 @@ table tbody tr[style*="rgba(59, 130, 246, 0.1)"] {
     overflow: visible !important;
   }
 
-  .canvas-frame {
+  .stage-frame {
     border: 1px solid var(--border-strong) !important;
     box-shadow: none !important;
     border-radius: 0 !important;

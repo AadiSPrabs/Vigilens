@@ -5,7 +5,7 @@ import FindingsList from './components/FindingsList'
 import HazardLog from './components/HazardLog'
 import Banner from './components/Banner'
 import ThemeToggle from './components/ThemeToggle'
-import { AlertIcon } from './components/Icons'
+import { AlertIcon, CameraFrameIcon } from './components/Icons'
 import { analyzeImage, checkHealth } from './api/auditClient'
 import { resolveEvidence } from './lib/evidence'
 
@@ -195,6 +195,14 @@ function App() {
       
       <main className="main">
         <section className="workspace" aria-label="Image workspace">
+          {!audit && !loading && (
+            <div className="canvas-stage">
+              <div className="stage-frame stage-frame--empty">
+                <CameraFrameIcon size={72} className="stage-empty__icon" />
+                <p className="stage-empty__text">Choose a sample or upload a site image to begin.</p>
+              </div>
+            </div>
+          )}
           {showAuditImage && (
             <div className="canvas-stage">
               <AuditImage
@@ -279,17 +287,26 @@ function App() {
 
           <div className="inspector-body">
             {loading && (
-              <div className="card inspector-message">
+              <div className="state-panel inspector-message loading-panel" role="status" aria-live="polite">
+                <span className="spinner" aria-hidden="true" />
                 <p>Analyzing...</p>
-                {timeoutMessage && <p style={{ color: 'var(--medium)' }}>No response yet; the audit may still be running</p>}
-                <button className="btn btn-secondary" onClick={handleCancel}>Cancel</button>
-                {timeoutMessage && !requestInFlightRef.current && <button className="btn" onClick={handleTryAgain} style={{ marginLeft: '0.5rem' }}>Try again</button>}
+                {timeoutMessage && <p className="inspector-warning">No response yet; the audit may still be running</p>}
+                <div className="inspector-actions">
+                  <button className="btn btn-secondary" onClick={handleCancel}>Cancel</button>
+                  {timeoutMessage && !requestInFlightRef.current && (
+                    <button className="btn btn-secondary" onClick={handleTryAgain}>Try again</button>
+                  )}
+                </div>
               </div>
             )}
             {error && (
-              <div className="card inspector-message">
-                <p style={{ color: 'var(--critical)' }}>{error}</p>
-                {error !== 'Analysis cancelled' && !loading && <button className="btn" onClick={handleTryAgain}>Try again</button>}
+              <div className="state-panel state-panel--danger inspector-message" role="alert">
+                <p>{error}</p>
+                {error !== 'Analysis cancelled' && !loading && (
+                  <div className="inspector-actions">
+                    <button className="btn btn-secondary" onClick={handleTryAgain}>Try again</button>
+                  </div>
+                )}
               </div>
             )}
             {audit && !loading && (
@@ -330,7 +347,7 @@ function App() {
               </>
             )}
             {!audit && !loading && !error && (
-              <div className="card inspector-empty">
+              <div className="state-panel inspector-empty">
                 <h2>Results</h2>
                 <p>Run analysis to see results</p>
               </div>

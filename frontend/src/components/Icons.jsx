@@ -72,6 +72,30 @@ export function ChevronDownIcon({ size = 16, className }) {
   )
 }
 
+export function ChevronUpIcon({ size = 16, className }) {
+  return (
+    <Icon size={size} className={className}>
+      <path d="m5.5 12 4.5-4.5L14.5 12" />
+    </Icon>
+  )
+}
+
+export function ChevronLeftIcon({ size = 16, className }) {
+  return (
+    <Icon size={size} className={className}>
+      <path d="m12 5.5-4.5 4.5 4.5 4.5" />
+    </Icon>
+  )
+}
+
+export function ChevronRightIcon({ size = 16, className }) {
+  return (
+    <Icon size={size} className={className}>
+      <path d="m8 5.5 4.5 4.5L8 14.5" />
+    </Icon>
+  )
+}
+
 export function TrashIcon({ size = 16, className }) {
   return (
     <Icon size={size} className={className}>
@@ -123,6 +147,41 @@ export function CameraFrameIcon({ size = 96, className }) {
       <rect x="28" y="32" width="40" height="32" rx="6" />
       <circle cx="48" cy="48" r="8" />
       <path d="M40 32l3-5h10l3 5" />
+    </svg>
+  )
+}
+
+export function PpeShape({ variant = 'unknown', size = 12 }) {
+  const common = {
+    width: size,
+    height: size,
+    viewBox: '0 0 12 12',
+    'aria-hidden': true,
+    focusable: 'false'
+  }
+
+  if (variant === 'present') {
+    return (
+      <svg {...common} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="6" cy="6" r="4.25" />
+        <path d="m3.8 6.1 1.5 1.5 2.9-3.1" />
+      </svg>
+    )
+  }
+
+  if (variant === 'absent') {
+    return (
+      <svg {...common} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+        <circle cx="6" cy="6" r="4.25" />
+        <path d="m4.2 4.2 3.6 3.6M7.8 4.2 4.2 7.8" />
+      </svg>
+    )
+  }
+
+  return (
+    <svg {...common} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="1.8 1.8">
+      <circle cx="6" cy="6" r="4.25" />
+      <path d="M6 4.2v2.1M6 7.9v.15" />
     </svg>
   )
 }
