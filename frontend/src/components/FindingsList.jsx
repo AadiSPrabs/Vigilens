@@ -72,7 +72,7 @@ export default function FindingsList({ audit, selectedId, onSelectPerson, decisi
       <>
         {printAction}
         <div className="state-panel state-panel--warning" role="status">
-          <h2>Findings</h2>
+          <h2 className="findings-header">Findings</h2>
           <p>No people detected; not a safety clearance.</p>
         </div>
       </>
@@ -84,7 +84,7 @@ export default function FindingsList({ audit, selectedId, onSelectPerson, decisi
       <>
         {printAction}
         <div className="state-panel state-panel--warning" role="status">
-          <h2>Findings</h2>
+          <h2 className="findings-header">Findings</h2>
           <p>No zones were checked; this is not proof the area is safe.</p>
         </div>
       </>

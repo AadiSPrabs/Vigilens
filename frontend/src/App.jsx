@@ -349,8 +349,8 @@ function App() {
             )}
             {!audit && !loading && !error && (
               <div className="state-panel inspector-empty">
-                <h2>Results</h2>
-                <p>Run analysis to see results</p>
+                <CameraFrameIcon size={48} className="stage-empty__icon" />
+                <p className="stage-empty__text">Choose a sample or upload a site image to begin.</p>
               </div>
             )}
           </div>
