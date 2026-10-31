@@ -427,7 +427,7 @@ export default function UploadZoneEditor({
           )}
 
           <button
-            className="btn analyse-btn"
+            className="btn btn-primary analyse-btn"
             disabled={!canRun}
             onClick={onAnalyse}
           >

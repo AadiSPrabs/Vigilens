@@ -4,6 +4,8 @@ import AuditImage from './components/AuditImage'
 import FindingsList from './components/FindingsList'
 import HazardLog from './components/HazardLog'
 import Banner from './components/Banner'
+import ThemeToggle from './components/ThemeToggle'
+import { AlertIcon } from './components/Icons'
 import { analyzeImage, checkHealth } from './api/auditClient'
 import { resolveEvidence } from './lib/evidence'
 
@@ -152,8 +154,8 @@ function App() {
           <h1>Vigilens</h1>
         </div>
         <div className="topbar-actions">
-          <Banner fromFixture={showFixtureBanner} fixtureNotice={audit?.fixture_notice} />
           <span className="mode-badge">{isFixtureMode ? 'Fixture mode' : 'Backend'}</span>
+          <ThemeToggle />
           {audit && !loading && (
             <button
               type="button"
@@ -166,7 +168,15 @@ function App() {
           )}
         </div>
       </header>
-      {healthBanner && <div className="banner banner-health">{healthBanner}</div>}
+      <div className="banner-stack">
+        <Banner fromFixture={showFixtureBanner} fixtureNotice={audit?.fixture_notice} />
+        {healthBanner && (
+          <div className="notice notice--danger" role="status" aria-live="polite">
+            <AlertIcon size={16} className="notice__icon" />
+            <span className="notice__text">{healthBanner}</span>
+          </div>
+        )}
+      </div>
       <div aria-live="polite" aria-atomic="true" className="sr-only">{announce}</div>
 
       {audit && !loading && (
@@ -174,7 +184,11 @@ function App() {
           <h1>VIGILENS | SITE SAFETY AUDIT REPORT</h1>
           <div className="print-meta">
             <span>Audit ID: {audit.audit_id || audit.id || 'Not provided'}</span>
-            <span>Loaded: {audit.fixture_loaded_at || audit.created_at || 'Not provided'}</span>
+            <span>
+              {audit.fixture_loaded_at
+                ? `Fixture loaded at: ${audit.fixture_loaded_at}`
+                : `Loaded at: ${audit.created_at || 'Not provided'}`}
+            </span>
           </div>
         </div>
       )}
@@ -280,31 +294,38 @@ function App() {
             )}
             {audit && !loading && (
               <>
-                {activeTab === 'findings' ? (
-                  <div role="tabpanel" id="panel-findings" aria-labelledby="tab-findings">
-                    <FindingsList 
-                      audit={audit}
-                      selectedId={selectedId}
-                      onSelectPerson={setSelectedId}
-                      decisions={decisions}
-                      setDecisions={setDecisions}
-                      filters={filters}
-                      setFilters={setFilters}
-                      showHeader={false}
-                    />
-                  </div>
-                ) : (
-                  <div role="tabpanel" id="panel-log" aria-labelledby="tab-log">
-                    <HazardLog 
-                      audit={audit}
-                      selectedId={selectedId}
-                      onSelectPerson={setSelectedId}
-                      decisions={decisions}
-                    />
-                  </div>
-                )}
+                <div
+                  role="tabpanel"
+                  id="panel-findings"
+                  aria-labelledby="tab-findings"
+                  hidden={activeTab !== 'findings'}
+                >
+                  <FindingsList
+                    audit={audit}
+                    selectedId={selectedId}
+                    onSelectPerson={setSelectedId}
+                    decisions={decisions}
+                    setDecisions={setDecisions}
+                    filters={filters}
+                    setFilters={setFilters}
+                    showHeader={false}
+                  />
+                </div>
+                <div
+                  role="tabpanel"
+                  id="panel-log"
+                  aria-labelledby="tab-log"
+                  hidden={activeTab !== 'log'}
+                >
+                  <HazardLog
+                    audit={audit}
+                    selectedId={selectedId}
+                    onSelectPerson={setSelectedId}
+                    decisions={decisions}
+                  />
+                </div>
                 {showFixtureBanner && <p className="inspector-meta">Evidence export disabled</p>}
-                {audit.fixture_loaded_at && <p className="inspector-meta">fixture loaded at: {audit.fixture_loaded_at}</p>}
+                {audit.fixture_loaded_at && <p className="inspector-meta">Fixture loaded at: {audit.fixture_loaded_at}</p>}
                 {audit.created_at && !audit.fixture_loaded_at && <p className="inspector-meta">Created: {audit.created_at}</p>}
               </>
             )}

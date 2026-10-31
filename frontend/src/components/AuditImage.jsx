@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { getSeverityStyle, isPersonFullyEquipped } from '../lib/severity'
+import { isPersonFullyEquipped } from '../lib/severity'
 import { resolveEvidence } from '../lib/evidence'
 
 function getZoneLabelForPerson(audit, person) {
@@ -98,20 +98,19 @@ export default function AuditImage({ audit, selectedId, onSelectPerson, uploaded
     }
   }
   
-  const getPersonColor = (person) => {
+  const getPersonVariant = (person) => {
     if (isPersonFullyEquipped(person)) {
-      return '#16a34a'
+      return 'no-listed'
     }
     const findings = person.findings || []
     const hasUncertainty = findings.some(f => f.kind === 'uncertainty')
     if (hasUncertainty && findings.every(f => f.kind === 'uncertainty')) {
-      return '#64748b'
+      return 'neutral'
     }
-    if (person.worst_severity) {
-      const style = getSeverityStyle(person.worst_severity)
-      return style.neutral ? '#64748b' : style.color
-    }
-    return '#64748b'
+    if (person.worst_severity === 'Critical') return 'critical'
+    if (person.worst_severity === 'Medium') return 'medium'
+    if (person.worst_severity === 'Low') return 'low'
+    return 'neutral'
   }
   
   const getPersonLabel = (person, idx) => {
@@ -188,15 +187,12 @@ export default function AuditImage({ audit, selectedId, onSelectPerson, uploaded
           ))}
           {(audit.persons || []).map((person, idx) => {
             const isSelected = selectedId === person.id
-            const color = getPersonColor(person)
+            const variant = getPersonVariant(person)
             return (
               <polygon
                 key={person.id}
-                className="zone-polygon"
+                className={`zone-polygon person-outline person-outline--${variant}${isSelected ? ' is-selected' : ''}`}
                 points={person.polygon.map(p => `${p.x},${p.y}`).join(' ')}
-                fill={isSelected ? color + '40' : color + '20'}
-                stroke={color}
-                strokeWidth={isSelected ? '0.004' : '0.002'}
                 tabIndex={0}
                 role="button"
                 aria-label={getPersonLabel(person, idx)}

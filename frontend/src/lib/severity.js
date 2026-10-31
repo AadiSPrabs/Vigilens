@@ -5,18 +5,36 @@
 // - Green is used only when findings empty AND helmet and vest both "present" (fully equipped person)
 // - Person outline tinted by worst_severity if present else neutral; never use findings[0]
 // - Uncertainty: kind:"uncertainty" with severity:null -> "Uncertain - needs human check", not violation/equipped status
+//
+// Colours live in styles.css as theme tokens. These helpers return token
+// references so the same semantics re-theme live in Day and Night.
+
+const NEUTRAL_STYLE = {
+  color: 'var(--sev-neutral-stroke)',
+  fill: 'var(--sev-neutral-fill)',
+  stroke: 'var(--sev-neutral-stroke)'
+}
+
+const SEVERITY_STYLES = {
+  Critical: {
+    color: 'var(--sev-critical-stroke)',
+    fill: 'var(--sev-critical-fill)',
+    stroke: 'var(--sev-critical-stroke)'
+  },
+  Medium: {
+    color: 'var(--sev-medium-stroke)',
+    fill: 'var(--sev-medium-fill)',
+    stroke: 'var(--sev-medium-stroke)'
+  },
+  Low: {
+    color: 'var(--sev-low-stroke)',
+    fill: 'var(--sev-low-fill)',
+    stroke: 'var(--sev-low-stroke)'
+  }
+}
 
 export function getSeverityStyle(severity) {
-  if (severity === 'Critical') {
-    return { color: '#dc2626', fill: 'rgba(220,38,38,0.1)', stroke: '#dc2626' }
-  }
-  if (severity === 'Medium') {
-    return { color: '#f59e0b', fill: 'rgba(245,158,11,0.1)', stroke: '#f59e0b' }
-  }
-  if (severity === 'Low') {
-    return { color: '#64748b', fill: 'rgba(100,116,139,0.1)', stroke: '#64748b' }
-  }
-  return { color: '#6b7280', fill: 'rgba(107,114,128,0.05)', stroke: '#6b7280' }
+  return SEVERITY_STYLES[severity] || NEUTRAL_STYLE
 }
 
 export function isPersonFullyEquipped(person) {
@@ -28,21 +46,25 @@ export function isPersonFullyEquipped(person) {
 }
 
 export function getPersonColor(person) {
-  if (!person) return { color: '#6b7280', fill: 'rgba(107,114,128,0.05)', stroke: '#6b7280' }
+  if (!person) return NEUTRAL_STYLE
   // Check for uncertainty
   if (Array.isArray(person.findings)) {
     for (const f of person.findings) {
       if (f.kind === 'uncertainty') {
-        return { color: '#6b7280', fill: 'rgba(107,114,128,0.05)', stroke: '#6b7280' }
+        return NEUTRAL_STYLE
       }
     }
   }
   if (isPersonFullyEquipped(person)) {
-    return { color: '#16a34a', fill: 'rgba(22,163,74,0.1)', stroke: '#16a34a' }
+    return {
+      color: 'var(--sev-no-listed-stroke)',
+      fill: 'var(--sev-no-listed-fill)',
+      stroke: 'var(--sev-no-listed-stroke)'
+    }
   }
   if (person.worst_severity) {
     return getSeverityStyle(person.worst_severity)
   }
   // neutral
-  return { color: '#6b7280', fill: 'rgba(107,114,128,0.05)', stroke: '#6b7280' }
+  return NEUTRAL_STYLE
 }
