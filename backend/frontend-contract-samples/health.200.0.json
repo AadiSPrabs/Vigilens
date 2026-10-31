@@ -1,0 +1,14 @@
+{
+ "capabilities": {
+  "evidence_export": false,
+  "fresh_review_routes_mounted": true,
+  "max_people_per_image": 2,
+  "provider_execution": "server_configured_source_grant_and_budget_required",
+  "public_authentication": false,
+  "trusted_clip_decode_configured": false
+ },
+ "fixture_configured": false,
+ "mode": "private_review_configured",
+ "real_analysis_enabled": false,
+ "status": "ok"
+}

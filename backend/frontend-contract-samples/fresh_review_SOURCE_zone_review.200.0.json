@@ -1,0 +1,55 @@
+{
+ "automatic_contact": false,
+ "compliance_status": "not_evaluated",
+ "contract_version": "vigilens.zone-review.proposal.v1",
+ "evidence_export_allowed": false,
+ "persons": [
+  {
+   "basis": "operator_zones_and_current_manual_contact_not_automatic",
+   "contact_event_id": 1,
+   "display_zone_id": "generated-zone",
+   "person_id": "0",
+   "safety_decision": false,
+   "status": "operator_contact_geometry",
+   "zone_ids": [
+    "generated-zone"
+   ]
+  }
+ ],
+ "policy_status": "not_applied",
+ "privacy_review_status": "not_validated",
+ "provider_calls_this_request": 0,
+ "result_sha256": "18a0824c86eebe4e9d23a962b1db9b1fb55464ae4f24043f2ae0ba84598248fa",
+ "source_digest": "c04ceef86c178f47708c94cf1a0c829ebd88e5c0610202e6caa14a804d140e95",
+ "zone_snapshot": {
+  "at": 1793254397.6971009,
+  "event_id": 1,
+  "reviewer_label": "synthetic operator",
+  "zones": [
+   {
+    "hazard": true,
+    "id": "generated-zone",
+    "name": "Generated geometry only",
+    "points": [
+     {
+      "x": 0.01,
+      "y": 0.01
+     },
+     {
+      "x": 0.99,
+      "y": 0.01
+     },
+     {
+      "x": 0.99,
+      "y": 0.99
+     },
+     {
+      "x": 0.01,
+      "y": 0.99
+     }
+    ]
+   }
+  ],
+  "zones_sha256": "8333903332c23a98eb2c91865069f09338edeec151580f199a1b3379c2fde93e"
+ }
+}

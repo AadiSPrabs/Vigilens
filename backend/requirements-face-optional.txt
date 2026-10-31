@@ -1,0 +1,3 @@
+# Optional local proposal detector only, not report privacy coverage certification.
+opencv-python-headless==4.13.0.92
+numpy==2.2.6
