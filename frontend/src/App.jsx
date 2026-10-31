@@ -317,6 +317,7 @@ function App() {
                   aria-labelledby="tab-findings"
                   hidden={activeTab !== 'findings'}
                 >
+                  <h2 className="print-section-title">Findings</h2>
                   <FindingsList
                     audit={audit}
                     selectedId={selectedId}

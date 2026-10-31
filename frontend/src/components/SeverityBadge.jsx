@@ -6,7 +6,7 @@ const KNOWN_SEVERITIES = ['Critical', 'Medium', 'Low']
 export default function SeverityBadge({ severity, kind }) {
   const isUncertain = kind === 'uncertainty' || severity === 'Uncertain'
   const isKnown = KNOWN_SEVERITIES.includes(severity)
-  const label = isUncertain ? 'Uncertain' : (isKnown ? severity : (severity || 'Unknown'))
+  const label = isUncertain ? 'Uncertain - needs human check' : (isKnown ? severity : (severity || 'Unknown'))
   const variant = isUncertain ? 'uncertain' : (isKnown ? label.toLowerCase() : 'unknown')
   return (
     <span className={`severity-badge severity-${variant}`} aria-label={`Severity: ${label}`}>

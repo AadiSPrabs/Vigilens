@@ -203,7 +203,10 @@ export default function FindingsList({ audit, selectedId, onSelectPerson, decisi
 
                 <div className="finding-meta">
                   {isUncertainty ? (
-                    <span className="uncertainty-badge" title="Needs human check">Uncertain - needs human check</span>
+                    <span className="uncertainty-badge" title="Needs human check">
+                      <SeverityShape variant="uncertain" size={12} />
+                      <span>Uncertain - needs human check</span>
+                    </span>
                   ) : (
                     <SeverityBadge severity={finding.severity} />
                   )}
