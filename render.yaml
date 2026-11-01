@@ -19,7 +19,7 @@ services:
       - key: PYTHON_VERSION
         value: "3.13"
       - key: VIGILENS_TRANSPORT
-        value: synthetic
+        sync: false   # operator-set in dashboard (synthetic qualification vs meta live); blueprint sync must not revert it
       - key: VIGILENS_LOCAL_ACCESS_TOKEN
         sync: false   # Aadi sets in dashboard; same value on both services. Server-side secret now - never in the JS bundle.
       - key: VIGILENS_DATABASE_URL
