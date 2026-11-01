@@ -14,10 +14,14 @@ import { getSession } from "@agent-native/core/server";
 import { proxyToBackend, displaySessionFor } from "../vigilens-proxy";
 
 function fakeEvent(headers: Record<string, string> = {}) {
-  const h = new Headers({ host: "vigilens-frontend.onrender.com", ...headers });
+  // A resolved better-auth session implies the request presented its cookie;
+  // default to one so tests exercise the verified path. Tests override by
+  // passing their own cookie header.
+  const base = { host: "vigilens-frontend.onrender.com", cookie: "an.session_token=test-ba-token.testsig" };
+  const h = new Headers({ ...base, ...headers });
   return {
     req: new Request("https://vigilens-frontend.onrender.com/api/vigilens/health", { headers: h }),
-    node: { req: { headers: { host: "vigilens-frontend.onrender.com", ...headers }, socket: { localPort: 4317 } } },
+    node: { req: { headers: { ...base, ...headers }, socket: { localPort: 4317 } } },
     context: {},
   } as never;
 }
@@ -51,6 +55,79 @@ afterEach(() => {
   vi.unstubAllGlobals();
   delete process.env.VIGILENS_BACKEND_URL;
   delete process.env.VIGILENS_LOCAL_ACCESS_TOKEN;
+});
+
+const FRAMEWORK_SESSION_PATH = "/_agent-native/auth/session";
+
+describe("framework (UI login) session verification", () => {
+  it("accepts a UI-login an_session verified through the framework session endpoint; the better-auth check is not called", async () => {
+    const fetchMock = vi.fn((url: unknown) => {
+      const u = String(url);
+      if (u.includes(FRAMEWORK_SESSION_PATH)) {
+        return Promise.resolve(new Response(JSON.stringify({ email: SESSION.email }), { status: 200 }));
+      }
+      if (u.includes(SELF_AUTH_PATH)) {
+        return Promise.resolve(new Response(JSON.stringify({ user: null }), { status: 200 }));
+      }
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const event = fakeEvent({ cookie: "an_session=fw-token-123; an_session_hint=1" });
+    await proxyToBackend(event, "/health", { method: "GET" });
+    expect(fetchMock.mock.calls.some((c) => String(c[0]).includes(FRAMEWORK_SESSION_PATH))).toBe(true);
+    expect(fetchMock.mock.calls.some((c) => String(c[0]).includes(SELF_AUTH_PATH))).toBe(false);
+    const fwCall = fetchMock.mock.calls.find((c) => String(c[0]).includes(FRAMEWORK_SESSION_PATH));
+    expect((fwCall?.[1] as RequestInit).headers).toEqual({ cookie: "an_session=fw-token-123" });
+    expect(backendCalls(fetchMock)).toHaveLength(1);
+  });
+
+  it("rejects a revoked UI-login session (framework endpoint says not authenticated) with 401 before any backend call", async () => {
+    const fetchMock = vi.fn((url: unknown) => {
+      const u = String(url);
+      if (u.includes(FRAMEWORK_SESSION_PATH)) {
+        return Promise.resolve(new Response(JSON.stringify({ error: "Not authenticated" }), { status: 200 }));
+      }
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const event = fakeEvent({ cookie: "an_session=revoked-token" });
+    await expect(proxyToBackend(event, "/health", { method: "GET" })).rejects.toMatchObject({ statusCode: 401 });
+    expect(backendCalls(fetchMock)).toHaveLength(0);
+  });
+
+  it("fails closed 503 when the framework session endpoint is unreachable", async () => {
+    const fetchMock = vi.fn(() => Promise.reject(new Error("connection refused")));
+    vi.stubGlobal("fetch", fetchMock);
+    const event = fakeEvent({ cookie: "an_session=fw-token-123" });
+    await expect(proxyToBackend(event, "/health", { method: "GET" })).rejects.toMatchObject({ statusCode: 503 });
+    expect(backendCalls(fetchMock)).toHaveLength(0);
+  });
+
+  it("falls back to the better-auth check when the framework cookie belongs to a different account than the resolved session", async () => {
+    const fetchMock = vi.fn((url: unknown) => {
+      const u = String(url);
+      if (u.includes(FRAMEWORK_SESSION_PATH)) {
+        return Promise.resolve(new Response(JSON.stringify({ email: "someone-else@example.com" }), { status: 200 }));
+      }
+      if (u.includes(SELF_AUTH_PATH)) {
+        return Promise.resolve(new Response(JSON.stringify({ user: { email: SESSION.email } }), { status: 200 }));
+      }
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const event = fakeEvent({ cookie: "an_session=other-account; an.session_token=ba-token.sig" });
+    await proxyToBackend(event, "/health", { method: "GET" });
+    expect(fetchMock.mock.calls.some((c) => String(c[0]).includes(SELF_AUTH_PATH))).toBe(true);
+    expect(backendCalls(fetchMock)).toHaveLength(1);
+  });
+
+  it("still 401s a session that resolved with neither known session cookie", async () => {
+    const fetchMock = routingFetch(() => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const event = fakeEvent({ cookie: "an_session_hint=1" });
+    await expect(proxyToBackend(event, "/health", { method: "GET" })).rejects.toMatchObject({ statusCode: 401 });
+    expect(backendCalls(fetchMock)).toHaveLength(0);
+  });
 });
 
 describe("vigilens proxy boundary", () => {

@@ -25,8 +25,83 @@ export async function requireVigilensSession(event: H3Event) {
   if (!session || !session.email) {
     throw createError({ statusCode: 401, statusMessage: "Sign in required" });
   }
-  await requireServerVerifiedSession(event);
+  await requireVerifiedSessionFor(event, session.email);
   return session;
+}
+
+const BA_SESSION_COOKIE_RE = /(?:^|;\s*)(?:__Secure-)?[\w.-]*session_token\s*=/;
+const FRAMEWORK_SESSION_COOKIE = "an_session";
+const FRAMEWORK_SESSION_PATH = "/_agent-native/auth/session";
+
+function cookieValue(cookieHeader: string, name: string): string | null {
+  for (const part of cookieHeader.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq < 0) continue;
+    if (part.slice(0, eq).trim() === name) {
+      const value = part.slice(eq + 1).trim();
+      return value.length > 0 ? value : null;
+    }
+  }
+  return null;
+}
+
+// Two session kinds reach this app:
+// - The UI sign-in page authenticates through the framework's own
+//   /_agent-native/auth/login and sets `an_session`. That token resolves
+//   against the server-side sessions table on EVERY request (no signed
+//   cookie cache), so re-checking it through the framework session endpoint
+//   is database-authoritative: logout deletes the row and the next check
+//   fails. A UI-signed-in visitor carries ONLY this cookie; sending them
+//   through the better-auth check below 401s every action (the deployed
+//   key-save regression).
+// - Direct better-auth sign-in sets `an.session_token` plus a 5-minute
+//   SIGNED cookie cache, so it needs the disableCookieCache database check.
+// The verified identity must match the session core resolved: a request can
+// carry both cookies, and core tries better-auth first, so an `an_session`
+// belonging to another account must not vouch for a better-auth identity.
+async function requireVerifiedSessionFor(event: H3Event, email: string) {
+  const cookie = getHeader(event, "cookie") || "";
+  const frameworkToken = cookieValue(cookie, FRAMEWORK_SESSION_COOKIE);
+  if (frameworkToken) {
+    const verified = await verifiedFrameworkEmail(event, frameworkToken);
+    if (verified && verified.toLowerCase() === email.toLowerCase()) return;
+    if (!BA_SESSION_COOKIE_RE.test(cookie)) {
+      throw createError({ statusCode: 401, statusMessage: "Sign in required" });
+    }
+  }
+  if (BA_SESSION_COOKIE_RE.test(cookie)) {
+    await requireServerVerifiedSession(event);
+    return;
+  }
+  throw createError({ statusCode: 401, statusMessage: "Sign in required" });
+}
+
+// Same loopback discipline as requireServerVerifiedSession: the actual
+// connection's local port (never the Host header), transport failure is a
+// 503 (fail closed), an unauthenticated answer is a plain null so the caller
+// can fall through to the better-auth check or 401. The framework endpoint
+// answers 200 with {"error":"Not authenticated"} for a dead token, so only a
+// body email counts. Only the framework cookie is forwarded - a stale
+// better-auth jar must not ride along and satisfy this check.
+async function verifiedFrameworkEmail(event: H3Event, token: string): Promise<string | null> {
+  const localPort = event.node?.req?.socket?.localPort;
+  const port = localPort || process.env.PORT;
+  if (!port) {
+    throw createError({ statusCode: 503, statusMessage: "Session verification unavailable" });
+  }
+  let res: Response;
+  try {
+    res = await fetch(`http://127.0.0.1:${port}${FRAMEWORK_SESSION_PATH}`, {
+      headers: { cookie: `${FRAMEWORK_SESSION_COOKIE}=${token}` },
+      signal: AbortSignal.timeout(10_000),
+      redirect: "error",
+    });
+  } catch {
+    throw createError({ statusCode: 503, statusMessage: "Session verification unavailable" });
+  }
+  if (!res.ok) return null;
+  const body = (await res.json().catch(() => null)) as { email?: unknown } | null;
+  return body && typeof body.email === "string" && body.email ? body.email : null;
 }
 
 // Server-verified revocation: better-auth keeps a 5-minute SIGNED cookie cache
