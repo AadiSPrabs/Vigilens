@@ -63,9 +63,14 @@ class SequentialWidePipeline(WideScenePipeline):
   a=p['assess']
   if a!='all_eligible'and(not isinstance(a,list)or len(set(a))!=len(a)or any(not isinstance(i,str)or not i for i in a)):raise ValueError('all_eligible or exact unique person IDs required')
   return p
- def validate_binding(self,b):
+ def validate_binding(self,b,*,retained_hold_verification=False):
   spec=self.approval_store.lookup(b['source_digest'],b['frame_size'])
-  if spec['provenance']['scope']!=self.execution_scope or b['source_digest']in self.carry()['blocked_source_digests']:raise ValueError('Exact approved non-repeated source scope required')
+  scope=spec['provenance'].get('scope')
+  # Same retained-hold rule as FreshPipeline: pre-spend re-verification of a
+  # retained row accepts the row's own recorded scope (one of the two known
+  # scopes); serving and new claims always require the current execution scope.
+  scope_ok=scope in('synthetic_local_qualification','private_provider_processing')if retained_hold_verification else scope==self.execution_scope
+  if not scope_ok or b['source_digest']in self.carry()['blocked_source_digests']:raise ValueError('Exact approved non-repeated source scope required')
   expected={'kind':KIND,'limits':asdict(self.wide_limits),'carry_sha256':self.carry_sha,'source_approval_snapshot':spec,'wide_plan':self.plan(spec),'zones':[],'export_allowed':False}
   if getattr(self,'_rebind',False):expected.pop('carry_sha256')  # only while the pinned continuation grant itself names prior and new checkpoints
   if any(type(b.get(k))is not type(v)or b[k]!=v for k,v in expected.items()):raise ValueError('Sequential limits/plan/approval changed')
@@ -184,7 +189,7 @@ class SequentialWidePipeline(WideScenePipeline):
    if Decimal(cost)!=listed:raise ValueError('Listed cost changed')
    known+=listed
   return objects,response,ppe,known,pending
- def read(self,source,owner=''):
+ def read(self,source,owner='',*,retained_hold_verification=False):
   if self._dsn is not None:
    c=self._connect_ro()
   else:
@@ -198,7 +203,7 @@ class SequentialWidePipeline(WideScenePipeline):
   try:
    if not row:return None
    calls=c.execute('SELECT ordinal,model,state,request_sha,response_sha,cost FROM calls WHERE owner=? AND source=? ORDER BY ordinal',(owner,source)).fetchall()
-   b=json.loads(row[3]);self.validate_binding(b)
+   b=json.loads(row[3]);self.validate_binding(b,retained_hold_verification=retained_hold_verification)
    if row[0]not in('running_uncertain','partial_completed','completed'):raise ValueError('Sequential state changed')
    result=json.loads(row[4])if row[4]else None;known=Decimal('0');pending=False;ppe={}
    if calls:

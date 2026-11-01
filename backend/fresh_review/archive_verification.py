@@ -19,7 +19,9 @@ class ArchiveVerification:
             from .db import open_store
             return open_store(self._dsn)
         c=sqlite3.connect(self.path);self.path.chmod(0o600);return c
-    def read(self,source,owner=None):
+    def read(self,source,owner=None,*,retained_hold_verification=False):
+        # No install scope exists on an archive verifier: integrity is the pinned
+        # archive provenance, so the retained-hold flag is accepted and inert.
         with concurrent.futures.ThreadPoolExecutor(max_workers=1)as pool:record=pool.submit(self.verifier).result()
         if set(record)!={'result','archive_provenance'}or record['archive_provenance'].get('original_fresh_job_restored')is not False:raise ValueError('Explicit verified archive provenance required')
         if record['result']['image']['pixel_digest']!=source:return None

@@ -182,7 +182,7 @@ class FreshPipeline:
         from .platform_private import path_private as _pp
         p=self.path.parent/name
         return p.is_file() and _pp(p,follow=False)
-    def read(self,source,owner=None):
+    def read(self,source,owner=None,*,retained_hold_verification=False):
         # owner None is the INTERNAL/operator any-account view (journal inspection,
         # status route, tests): it never crosses an HTTP visitor boundary - visitor
         # routes always pass their account hash explicitly. An explicit owner
@@ -206,7 +206,7 @@ class FreshPipeline:
         if not r:return None
         binding=json.loads(r[3])
         if binding.get('source_digest')!=source:raise ValueError('Job source binding changed')
-        self.validate_binding(binding)
+        self.validate_binding(binding,retained_hold_verification=retained_hold_verification)
         result=json.loads(r[4])if r[4]else None
         if result is not None:
             if digest(result)!=r[5]:raise ValueError('Stored fresh result changed')
@@ -222,10 +222,22 @@ class FreshPipeline:
         finally:c.close()
         out_owner=r[6];out_key_fp=r[7]
         return {'owner':out_owner,'key_fp':out_key_fp,'accounting_settlement':settlement,'requires_operator_reconciliation':r[0]!='completed','execution_status':'completed_provider_observations'if r[0]=='completed'else'attempt_uncertain_terminal_no_retry','state':r[0],'reservation_usd':r[1],'known_listed_usd':r[2],'binding':json.loads(r[3]),'result':result,'retry_allowed':False,'provider_calls_this_request':0,'attempted_provider_calls_total':self.attempted_count(source,r[6]),'provider_call_count_status':'attempts_recorded_debit_unchecked'if r[0]=='completed'else'uncertain_requires_reconciliation','actual_debit':'unchecked','evidence_export_allowed':False}
-    def validate_binding(self,binding):
+    def validate_binding(self,binding,*,retained_hold_verification=False):
         if binding['source_digest']in self.carry()['blocked_source_digests']:raise ValueError('Previously paid source blocked throughout lifecycle')
         spec=self.approval_store.lookup(binding['source_digest'],binding['frame_size'])
-        if spec['provenance']['scope']!=self.execution_scope:raise ValueError('Approval scope differs from execution scope')
+        scope=spec['provenance'].get('scope')
+        if retained_hold_verification:
+            # Pre-spend re-verification of a RETAINED journal row only (claim's
+            # hold check): the row was journaled under the install scope active
+            # at its own recording - e.g. synthetic qualification before an
+            # operator switches the install to live BYOK. Its recorded approval
+            # scope is accepted at face value (it must still be one of the two
+            # known scopes and pass every other integrity check below; an
+            # unknown or tampered scope fails closed). This relaxation never
+            # applies to serving a result or to a new claim's own binding:
+            # those always require the current execution scope.
+            if scope not in ('synthetic_local_qualification','private_provider_processing'):raise ValueError('Approval scope differs from execution scope')
+        elif scope!=self.execution_scope:raise ValueError('Approval scope differs from execution scope')
         expected={'sam_model':'sam-3.1','ppe_model':'muse-spark-1.3','ppe_max_output_tokens':512,'max_people':2,'carry_sha256':self.carry_sha,'zones':[],'zone_policy':'not_applied','export_allowed':False,'source_approval_snapshot':spec,'source_approval_reference':spec['rights_reference']}
         if any(type(binding.get(k))is not type(v)or binding[k]!=v for k,v in expected.items()):raise ValueError('Source approval/configuration changed')
     def verify_artifacts(self,source,result,binding,owner=''):
@@ -314,7 +326,7 @@ class FreshPipeline:
             if c.execute('SELECT count(*) FROM jobs').fetchone()[0]>=64:raise ValueError('Journal bound reached; retain tombstones')
             rows=c.execute('SELECT owner,source,state,reserved,cost FROM jobs').fetchall()
             for oldowner,oldsource,state,reserved,cost in rows:
-                self.read(oldsource,oldowner) #Verify persisted completed cost/artifacts and all retained holds before new spend.
+                self.read(oldsource,oldowner,retained_hold_verification=True) #Verify persisted completed cost/artifacts and all retained holds before new spend, under each row's own recorded scope.
             from .recheck_journal import reservation_total
             from .recheck_execution import verify_retained_rechecks
             verify_retained_rechecks(self,c)

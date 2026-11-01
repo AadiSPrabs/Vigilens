@@ -39,14 +39,14 @@ class RecheckExecutor:
         svc=self.service;name='recheck-'+aid+'-'+str(ordinal)+'-'+suffix
         if getattr(svc,'_dsn',None) is not None:return svc._write_artifact(name,raw)
         return svc.save_private(svc.path.parent/name,raw)
-    def read(self,aid,connection=None):
+    def read(self,aid,connection=None,*,retained_hold_verification=False):
         c=connection or self.service.connect()
         try:
             reservation_total(c)
             row=c.execute('SELECT state,plan,plan_sha,cost,owner FROM recheck_attempts WHERE attempt_id=?',(aid,)).fetchone()
             if row is None:raise ValueError('Unknown recheck attempt')
             owner=row[4]or''
-            plan=json.loads(row[1]);job=self.service.read(plan['source_digest'],owner)
+            plan=json.loads(row[1]);job=self.service.read(plan['source_digest'],owner,retained_hold_verification=retained_hold_verification)
             if job is None or digest(job['result'])!=plan['result_sha256']:raise ValueError('Original result changed')
             source_png=self.service._read_artifact(self.service._art(owner,plan['source_digest'],'source.png'))
             if plan!=plan_recheck(source_png,job['result'],plan['person_id'],attempts_so_far=0,max_attempts=1):raise ValueError('Recheck plan differs from canonical original crop')
@@ -157,4 +157,4 @@ def verify_retained_rechecks(service,connection):
     if not connection.execute("SELECT 1 FROM sqlite_master WHERE name='recheck_attempts'").fetchone():return
     ids=[r[0]for r in connection.execute('SELECT attempt_id FROM recheck_attempts')]
     verifier=RecheckExecutor(service)
-    for aid in ids:verifier.read(aid,connection=connection)
+    for aid in ids:verifier.read(aid,connection=connection,retained_hold_verification=True)

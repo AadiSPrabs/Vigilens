@@ -63,7 +63,7 @@ def settle(service,source,owner=''):
 def original_total(service,c):
  total=Decimal('0')
  for owner,source,state,reserved,cost in c.execute('SELECT owner,source,state,reserved,cost FROM jobs').fetchall():
-  service.read(source,owner)
+  service.read(source,owner,retained_hold_verification=True)
   settled=verify(service,c,source,owner)
   total+=Decimal(settled['known_listed_usd'])if settled else Decimal(cost)if state=='completed'else Decimal(reserved)
  return total

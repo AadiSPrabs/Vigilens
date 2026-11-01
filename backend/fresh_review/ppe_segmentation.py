@@ -33,9 +33,9 @@ class PpeSegmentation:
     def schema(self,c):
         c.execute("CREATE TABLE IF NOT EXISTS ppe_mask_batches(id TEXT PRIMARY KEY,owner TEXT NOT NULL DEFAULT '',source TEXT,result_sha TEXT,plan TEXT,plan_sha TEXT,state TEXT,cost TEXT,result TEXT,result_hash TEXT,created REAL,UNIQUE(owner,source,result_sha))")
         c.execute('CREATE TABLE IF NOT EXISTS ppe_mask_calls(id TEXT,ordinal INTEGER,state TEXT,request_sha TEXT,response_sha TEXT,cost TEXT,PRIMARY KEY(id,ordinal))')
-    def plan(self,source,owner=None):
+    def plan(self,source,owner=None,*,retained_hold_verification=False):
         # owner None: operator/internal view, inherits the job's account.
-        job=self.service.read(source,owner)
+        job=self.service.read(source,owner,retained_hold_verification=retained_hold_verification)
         if job and owner is None:owner=job.get('owner')or''
         if not job or job['state']!='completed':raise ValueError('Completed original image required')
         raw=self.service._read_artifact(self.service._art(owner,source,'source.png'))
@@ -62,7 +62,7 @@ class PpeSegmentation:
             if c.execute('SELECT 1 FROM ppe_mask_batches WHERE id=?',(identity,)).fetchone():return identity
             if c.execute('SELECT count(*) FROM ppe_mask_batches').fetchone()[0]>=64:raise ValueError('PPE mask history full')
             rows=c.execute('SELECT owner,source,state,cost FROM jobs').fetchall()
-            for oldowner,old,_,_ in rows:self.service.read(old,oldowner)
+            for oldowner,old,_,_ in rows:self.service.read(old,oldowner,retained_hold_verification=True)
             from .recheck_execution import verify_retained_rechecks
             verify_retained_rechecks(self.service,c);verify_retained(self.service,c)
             from .explanation_execution import total as explanation_total,verify_retained as verify_explanations
@@ -93,7 +93,7 @@ class PpeSegmentation:
         parsed=await parse_sam_image_text(text,Frame(frame.width,frame.height,source),wire_completed=True)
         return {'concept':concept,'response_id':response['id'],'objects':[{'object_id':str(o['object_id']),'box_half_open':list(o['box_half_open']),'mask':encode_mask(o['mask'],list(o['box_half_open']),[frame.width,frame.height])}for o in parsed['objects']],
                 'empty_detection':'not_proof_of_absence','worn_by_person':'not_inferred_by_segmentation','listed_cost_usd':str(COST)}
-    def read(self,identity,connection=None):
+    def read(self,identity,connection=None,*,retained_hold_verification=False):
         c=connection or self.service.connect()
         try:
             total(c)
@@ -101,7 +101,7 @@ class PpeSegmentation:
             if row is None:raise ValueError('Unknown SAM PPE batch')
             self._batch_owner=row[7]or''
             plan=json.loads(row[2])
-            if self.plan(row[0],self._batch_owner)!=plan:raise ValueError('Original source/request plan changed')
+            if self.plan(row[0],self._batch_owner,retained_hold_verification=retained_hold_verification)!=plan:raise ValueError('Original source/request plan changed')
             calls=c.execute('SELECT ordinal,state,request_sha,response_sha,cost FROM ppe_mask_calls WHERE id=? ORDER BY ordinal',(identity,)).fetchall()
             parsed=[]
             if [r[0]for r in calls]!=list(range(len(calls)))or len(calls)>2:raise ValueError('PPE mask call ordering changed')
@@ -158,4 +158,4 @@ class PpeSegmentation:
 def verify_retained(service,connection):
     if not connection.execute("SELECT 1 FROM sqlite_master WHERE name='ppe_mask_batches'").fetchone():return
     helper=PpeSegmentation(service)
-    for identity, in connection.execute('SELECT id FROM ppe_mask_batches').fetchall():helper.read(identity,connection)
+    for identity, in connection.execute('SELECT id FROM ppe_mask_batches').fetchall():helper.read(identity,connection,retained_hold_verification=True)

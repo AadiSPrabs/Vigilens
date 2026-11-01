@@ -56,7 +56,7 @@ class ExplanationExecutor:
             has_jobs=c.execute("SELECT 1 FROM sqlite_master WHERE name='jobs'").fetchone()
             if not has_jobs and not getattr(self.service,'archive_verification_only',False):raise ValueError('Original jobs or explicit archive verifier required')
             rows=c.execute('SELECT owner,source,state,cost FROM jobs').fetchall()if has_jobs else[]
-            for oldowner,source,_,_ in rows:self.service.read(source,oldowner)
+            for oldowner,source,_,_ in rows:self.service.read(source,oldowner,retained_hold_verification=True)
             verify_retained_rechecks(self.service,c);verify_masks(self.service,c);verify_retained(self.service,c)
             from .stopped_source import original_total
             carry=self.service.carry()
@@ -66,13 +66,13 @@ class ExplanationExecutor:
             c.execute('INSERT INTO explanation_attempts VALUES(?,?,?,?,?,?,?,?,?,?,?)',(identity,owner,plan['source_digest'],plan['context_sha256'],json.dumps(plan,sort_keys=True),digest(plan),'reserved_not_dispatched','0',None,None,time.time()));c.commit()
             return identity
         finally:c.close()
-    def read(self,identity,c=None):
+    def read(self,identity,c=None,*,retained_hold_verification=False):
         connection=c or self.service.connect()
         try:
             total(connection)
             row=connection.execute('SELECT plan,state,cost,result,owner FROM explanation_attempts WHERE id=?',(identity,)).fetchone()
             if row is None:raise ValueError('Unknown explanation attempt')
-            plan=json.loads(row[0]);job=self.service.read(plan['source_digest'],row[4]or'')
+            plan=json.loads(row[0]);job=self.service.read(plan['source_digest'],row[4]or'',retained_hold_verification=retained_hold_verification)
             if job is None or digest(job['result'])!=plan['result_sha256']:raise ValueError('Original source/result changed')
             result=json.loads(row[3])if row[3]else None
             if row[1]=='completed':
@@ -116,4 +116,4 @@ class ExplanationExecutor:
 
 def verify_retained(service,c):
     if not c.execute("SELECT 1 FROM sqlite_master WHERE name='explanation_attempts'").fetchone():return
-    for identity, in c.execute('SELECT id FROM explanation_attempts').fetchall():ExplanationExecutor(service).read(identity,c)
+    for identity, in c.execute('SELECT id FROM explanation_attempts').fetchall():ExplanationExecutor(service).read(identity,c,retained_hold_verification=True)

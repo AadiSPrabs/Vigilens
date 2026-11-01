@@ -48,7 +48,7 @@ class RecheckJournal:
             if plan['status']!='planned_not_authorised_or_dispatched':return {**plan,'new_reservation':False,'dispatch_enabled':False}
             # Re-validate all prior original jobs/artifacts and aggregate before booking.
             rows=c.execute('SELECT owner,source,state,cost FROM jobs').fetchall()
-            for oldowner,oldsource,_,_ in rows:self.service.read(oldsource,oldowner)
+            for oldowner,oldsource,_,_ in rows:self.service.read(oldsource,oldowner,retained_hold_verification=True)
             from .recheck_execution import verify_retained_rechecks
             verify_retained_rechecks(self.service,c)
             from .ppe_segmentation import total as mask_total,verify_retained

@@ -51,9 +51,14 @@ class WideScenePipeline(FreshPipeline):
   ids=plan['selected_person_ids']
   if not isinstance(ids,list)or len(ids)>self.wide_limits.max_ppe_calls or len(set(ids))!=len(ids)or any(not isinstance(i,str)or not i for i in ids):raise ValueError('Bounded exact PPE person selection required')
   return plan
- def validate_binding(self,b):
+ def validate_binding(self,b,*,retained_hold_verification=False):
   spec=self.approval_store.lookup(b['source_digest'],b['frame_size'])
-  if spec['provenance']['scope']!=self.execution_scope or b['source_digest']in self.carry()['blocked_source_digests']:raise ValueError('Exact approved non-repeated source scope required')
+  scope=spec['provenance'].get('scope')
+  # Same retained-hold rule as FreshPipeline: pre-spend re-verification of a
+  # retained row accepts the row's own recorded scope (one of the two known
+  # scopes); serving and new claims always require the current execution scope.
+  scope_ok=scope in('synthetic_local_qualification','private_provider_processing')if retained_hold_verification else scope==self.execution_scope
+  if not scope_ok or b['source_digest']in self.carry()['blocked_source_digests']:raise ValueError('Exact approved non-repeated source scope required')
   expected={'kind':'wide_scene.v1','limits':asdict(self.wide_limits),'carry_sha256':self.carry_sha,'source_approval_snapshot':spec,'wide_plan':self.plan(spec),'zones':[],'export_allowed':False}
   if any(type(b.get(k))is not type(v)or b[k]!=v for k,v in expected.items()):raise ValueError('Wide source limits/plan/approval changed')
  def prepare(self,raw,mime,zones):
@@ -130,7 +135,7 @@ class WideScenePipeline(FreshPipeline):
    with Image.open(io.BytesIO(self._read_artifact(self._art(owner,source,'source.png'))))as im:buf=io.BytesIO();im.crop(obj['box_half_open']).save(buf,'PNG');crop_sha=hashlib.sha256(buf.getvalue()).hexdigest()
    persons.append({**obj,'crop_png_sha256':crop_sha,'helmet':obs['observation']['helmet']if obs else'unknown','vest':obs['observation']['vest']if obs else'unknown','ppe_assessed':obs is not None,'provider_observation':obs,'ppe_evidence_status':reason,'crop_eligibility':gates[pid],'selected_for_PPE':selected,'contact_status':'not_checked','compliance_status':'not_evaluated'})
   return {'source':'fresh_upload_provider_review','image':{'pixel_digest':source,'width':frame.width,'height':frame.height},'persons':persons,'zones':[],'zone_status':'not_checked','compliance_status':'not_evaluated','findings':None,'review_status':'needs_human_review','privacy_review_status':'not_validated','evidence_export_allowed':False,'sam_response_id':response['id'],'wide_scene':{'capacity':self.wide_limits.max_people,'detected_person_count':len(persons),'PPE_assessed_count':len(ppe),'all_detected_persons_retained':True,'coverage':'selected_crops_only_not_all_people_PPE','minimum_crop_size_is_technical_not_accuracy_validation':True},'provider_proof':'local_request_response_consistency_not_provider_signature'}
- def read(self,source,owner=''):
+ def read(self,source,owner='',*,retained_hold_verification=False):
   if self._dsn is not None:
    c=self._connect_ro()
   else:
@@ -142,7 +147,7 @@ class WideScenePipeline(FreshPipeline):
    raise
   finally:c.close()
   if not row:return None
-  b=json.loads(row[3]);self.validate_binding(b)
+  b=json.loads(row[3]);self.validate_binding(b,retained_hold_verification=retained_hold_verification)
   if row[0]not in ('completed','running_uncertain')or Decimal(row[1])!=self.wide_limits.reserve:raise ValueError('Wide hold/state changed')
   result=json.loads(row[4])if row[4]else None
   if result is not None:
