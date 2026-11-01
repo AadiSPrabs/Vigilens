@@ -1,0 +1,62 @@
+# Vigilens Render trial blueprint - PROXY ARCHITECTURE DRAFT (internal; deploy only after
+# Aadi's informed go: creating the free Postgres is an account resource mutation).
+# Architecture: browser -> frontend (Nitro, session auth) -> same-origin /api/vigilens/* ->
+# server-side proxy (VIGILENS_LOCAL_ACCESS_TOKEN, server-only) -> backend (token-gated 403).
+# The token NEVER ships in the client bundle (verified by bundle grep 2026-11-01).
+# Free tier: both services sleep after 15 min idle (~1 min cold start). Free Postgres:
+# 1 per workspace, 1GB, EXPIRES 30 days after creation - covers the Nov 5 demo window.
+# See RENDER-RUNBOOK.md for boot/restart/expiry semantics. Synthetic transport only here;
+# the real Meta key is set later by Aadi as a server-side
+# env var on the backend, never in this file, and only after durable spend records land.
+services:
+  - type: web
+    name: vigilens-backend
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: python backend/run_render.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13"
+      - key: VIGILENS_TRANSPORT
+        value: synthetic
+      - key: VIGILENS_LOCAL_ACCESS_TOKEN
+        sync: false   # Aadi sets in dashboard; same value on both services. Server-side secret now - never in the JS bundle.
+      - key: VIGILENS_DATABASE_URL
+        fromDatabase:
+          name: vigilens-db
+          property: connectionString   # INTERNAL string; boot appends sslmode=require (runbook). Durable journal/artifacts/approvals live here.
+      - key: VIGILENS_FRONTEND_ORIGINS
+        value: https://vigilens-frontend.onrender.com   # verify actual assigned URL at deploy
+      - key: VIGILENS_CAP
+        value: "5"
+
+  - type: web
+    name: vigilens-frontend
+    runtime: node
+    plan: free
+    buildCommand: cd frontend && corepack enable && pnpm install --frozen-lockfile && pnpm build
+    startCommand: node frontend/.output/server/index.mjs
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: BETTER_AUTH_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: vigilens-db
+          property: connectionString
+      - key: VIGILENS_BACKEND_URL
+        value: https://vigilens-backend.onrender.com   # verify actual assigned URL at deploy; proxies /api/vigilens/*
+      - key: VIGILENS_LOCAL_ACCESS_TOKEN
+        sync: false   # same value as the backend's; server-side only
+      # Optional open-registration control (code-read, runtime-UNVERIFIED):
+      # declaring auth.requireEmailVerification in agent-native.config.ts with no email
+      # provider configured makes the scaffold set disableSignUp=true (better-auth-instance.js:569).
+      # Owner access would then need Google OAuth (GOOGLE_CLIENT_ID/SECRET) - decide with key-audience answer.
+
+databases:
+  - name: vigilens-db
+    plan: free       # 1GB, expires 30 days; shared by better-auth (frontend) and, after the PG port, the pipeline store (separate table namespaces, 1 free PG per workspace)
+    databaseName: vigilens
+    user: vigilens

@@ -1,0 +1,72 @@
+--- /tmp/rv/integ/pkg/vigilens-app/backend/dev_install.py	2026-10-31 18:06:26.883359074 +0530
++++ backend/dev_install.py	2026-10-31 22:29:29.256219389 +0530
+@@ -72,7 +72,7 @@
+     return frame.digest
+ 
+ 
+-def create_state(state_dir, images=(), cors_origins=(), cap='5'):
++def create_state(state_dir, images=(), cors_origins=(), cap='5', seamless=False):
+     state = Path(state_dir)
+     if state.exists() and any(state.iterdir()):
+         raise ValueError('State directory must be empty or new (choose a fresh directory; do not reuse owner state)')
+@@ -97,7 +97,8 @@
+               'approval_path': str((state / 'approvals.json').resolve()),
+               'approval_sha256': hashlib.sha256(approvals_raw).hexdigest(),
+               'access_token_file': str((state / 'access-token.txt').resolve()),
+-              'cors_origins': list(cors_origins) or ['http://localhost:5173', 'http://127.0.0.1:5173']}
++              'cors_origins': list(cors_origins) or ['http://localhost:5173', 'http://127.0.0.1:5173'],
++              'seamless_upload_approval': bool(seamless)}
+     _private_write(state / 'dev-config.json', (json.dumps(config, indent=2, sort_keys=True) + '\n').encode())
+     return config
+ 
+@@ -147,10 +148,34 @@
+     if not 32 <= len(token) <= 256 or any(ord(c) < 33 or ord(c) > 126 for c in token):
+         raise ValueError('Strong local access token required')
+     scope = 'private_provider_processing' if transport == 'meta' else 'synthetic_local_qualification'
++    seamless = config.get('seamless_upload_approval') is True
++    if seamless:
++        # Synthetic and live installs both support the seamless flow; the recorded scope
++        # always matches the install's execution scope. Live seamless means the upload
++        # action is the recorded approval: an explicit install decision, labelled as such.
++        from fresh_review.demo_approvals import SeamlessDemoApprovalStore
++        approval_path = Path(config['approval_path'])
++        pin = config['approval_sha256']
++        sidecar = approval_path.with_name('approvals.recorded-sha256')
++        if sidecar.is_file() and approval_path.is_file():
++            recorded = sidecar.read_text().strip()
++            if hashlib.sha256(approval_path.read_bytes()).hexdigest() == recorded:
++                pin = recorded  # restart after seamless recordings: reload the recorded state
++        store = SeamlessDemoApprovalStore(approval_path, pin, scope=scope)
++    else:
++        store = ApprovalStore(Path(config['approval_path']), config['approval_sha256'])
++    cap_enforcement = config.get('cap_enforcement', True)
++    if type(cap_enforcement) is not bool:
++        raise ValueError('Explicit cap_enforcement boolean required when present')
++    if cap_enforcement is False and transport == 'meta':
++        # Owner direction (Aadi, demo steering): the app tracks spending but does not enforce a
++        # second app-level budget gate; the spending stop is the provider-side key limit. The
++        # ledger keeps booking every reservation and cost in full; only the refusal is off.
++        print('note: cap_enforcement=false - aggregate cap is tracked, not enforced; the provider-side key limit is the spending stop', file=sys.stderr)
+     service = FreshPipeline(config['journal'], execution_scope=scope,
+-                            approval_store=ApprovalStore(Path(config['approval_path']), config['approval_sha256']),
++                            approval_store=store,
+                             carry_path=Path(config['carry_path']), carry_sha=config['carry_sha256'],
+-                            transport=selected)
++                            transport=selected, cap_enforcement=cap_enforcement)
+     service.carry()  # validate accounting checkpoint before serving; no journal creation
+     origins = config.get('cors_origins')
+     if not isinstance(origins, list) or any(not isinstance(o, str) or not o.startswith(('http://localhost:', 'http://127.0.0.1:')) for o in origins):
+@@ -164,11 +189,12 @@
+     p.add_argument('--state-dir', required=True)
+     p.add_argument('--image', action='append', default=[], help='test image to approve (repeatable); PNG or JPEG')
+     p.add_argument('--origin', action='append', default=[], help='allowed loopback frontend origin, e.g. http://localhost:5173 (repeatable)')
++    p.add_argument('--seamless', action='store_true', help='setup: seamless demo flow - the upload action is recorded as the synthetic-scope approval at upload time (no per-image CLI approval or restart). Offline synthetic mode only; never valid with the meta transport.')
+     p.add_argument('--cap', default='5', help='setup: per-install aggregate budget cap in listed USD, sha-pinned into the install carry checkpoint (default 5; for live use set only an owner-approved limit)')
+     p.add_argument('--scope', default='synthetic_local_qualification', choices=SCOPES, help='approve: approval scope; live provider testing needs private_provider_processing')
+     a = p.parse_args()
+     if a.action == 'setup':
+-        config = create_state(a.state_dir, images=a.image, cors_origins=a.origin, cap=a.cap)
++        config = create_state(a.state_dir, images=a.image, cors_origins=a.origin, cap=a.cap, seamless=a.seamless)
+         print('Developer install created (OFFLINE synthetic mode; no provider access, no owner data).')
+         print('  config:      ' + str(Path(a.state_dir) / 'dev-config.json'))
+         print('  API key file:' , config['access_token_file'], '(read it locally; never commit or share it)')

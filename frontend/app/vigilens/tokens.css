@@ -1,0 +1,289 @@
+:root {
+  --vg-bg: #f5f5f7;
+  --vg-surface: #ffffff;
+  --vg-surface-raised: #ffffff;
+  --vg-surface-sunken: #ececf0;
+  --vg-border: #dcdce1;
+  --vg-border-strong: #8e8e93;
+  --vg-text: #1d1d1f;
+  --vg-text-secondary: #4a4a50;
+  --vg-text-tertiary: #636369;
+  --vg-accent: #0068d9;
+  --vg-accent-fg: #ffffff;
+  --vg-focus-ring: #0068d9;
+  --vg-hover: #ededf1;
+  --vg-selected: #e3effc;
+  --vg-halo: rgba(255, 255, 255, 0.92);
+  --vg-zone-hazard: #b45309;
+  --vg-zone-hazard-fill: rgba(180, 83, 9, 0.12);
+  --vg-zone-restricted: #4f6479;
+  --vg-zone-restricted-fill: rgba(79, 100, 121, 0.1);
+  --vg-banner-bg: #ffe08a;
+  --vg-banner-fg: #1d1d1f;
+  --vg-banner-border: #b86e00;
+  --vg-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.06), 0 1px 1px rgba(0, 0, 0, 0.04);
+  --vg-shadow-2: 0 4px 14px rgba(0, 0, 0, 0.08);
+
+  --vg-sev-critical-fg: #8e1b14;
+  --vg-sev-critical-bg: #fde7e5;
+  --vg-sev-critical-border: #d93025;
+  --vg-sev-medium-fg: #6e4300;
+  --vg-sev-medium-bg: #fff1d6;
+  --vg-sev-medium-border: #b86e00;
+  --vg-sev-low-fg: #2e4256;
+  --vg-sev-low-bg: #e4ebf2;
+  --vg-sev-low-border: #5b7187;
+  --vg-sev-uncertain-fg: #5b2a9c;
+  --vg-sev-uncertain-bg: #efe7fb;
+  --vg-sev-uncertain-border: #7d4cc4;
+  --vg-sev-neutral-fg: #3a3a3c;
+  --vg-sev-neutral-bg: #eeeef0;
+  --vg-sev-neutral-border: #8e8e93;
+  --vg-sev-clear-fg: #1e5c2e;
+  --vg-sev-clear-bg: #e3f4e7;
+  --vg-sev-clear-border: #2e7d42;
+  --vg-sev-critical-stroke: #d93025;
+  --vg-sev-medium-stroke: #b86e00;
+  --vg-sev-low-stroke: #4f6479;
+  --vg-sev-uncertain-stroke: #7d4cc4;
+  --vg-sev-neutral-stroke: #5c5c61;
+  --vg-sev-clear-stroke: #2e7d42;
+}
+
+.dark {
+  --vg-bg: #0b0b0d;
+  --vg-surface: #1c1c1e;
+  --vg-surface-raised: #2c2c2e;
+  --vg-surface-sunken: #121214;
+  --vg-border: #3a3a3c;
+  --vg-border-strong: #8e8e93;
+  --vg-text: #f5f5f7;
+  --vg-text-secondary: #c7c7cc;
+  --vg-text-tertiary: #a1a1a8;
+  --vg-accent: #0a84ff;
+  --vg-accent-fg: #0b0b0d;
+  --vg-focus-ring: #0a84ff;
+  --vg-hover: #2c2c2e;
+  --vg-selected: #17365c;
+  --vg-halo: rgba(0, 0, 0, 0.78);
+  --vg-zone-hazard: #ffb340;
+  --vg-zone-hazard-fill: rgba(255, 179, 64, 0.14);
+  --vg-zone-restricted: #9bb3c9;
+  --vg-zone-restricted-fill: rgba(155, 179, 201, 0.1);
+  --vg-banner-bg: #5c4300;
+  --vg-banner-fg: #ffe08a;
+  --vg-banner-border: #ffb340;
+  --vg-shadow-1: none;
+  --vg-shadow-2: none;
+
+  --vg-sev-critical-fg: #ff8a80;
+  --vg-sev-critical-bg: #3a1716;
+  --vg-sev-critical-border: #ff6b60;
+  --vg-sev-medium-fg: #ffd27a;
+  --vg-sev-medium-bg: #3d2c0c;
+  --vg-sev-medium-border: #ffb340;
+  --vg-sev-low-fg: #c4d4e3;
+  --vg-sev-low-bg: #22303d;
+  --vg-sev-low-border: #8fa8bf;
+  --vg-sev-uncertain-fg: #d4c0ff;
+  --vg-sev-uncertain-bg: #2d2146;
+  --vg-sev-uncertain-border: #b594ff;
+  --vg-sev-neutral-fg: #d1d1d6;
+  --vg-sev-neutral-bg: #2c2c2e;
+  --vg-sev-neutral-border: #8e8e93;
+  --vg-sev-clear-fg: #8fe3a4;
+  --vg-sev-clear-bg: #173622;
+  --vg-sev-clear-border: #4cc06a;
+  --vg-sev-critical-stroke: #ff6b60;
+  --vg-sev-medium-stroke: #ffb340;
+  --vg-sev-low-stroke: #9bb3c9;
+  --vg-sev-uncertain-stroke: #b594ff;
+  --vg-sev-neutral-stroke: #aeaeb2;
+  --vg-sev-clear-stroke: #4cc06a;
+}
+
+@theme inline {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable", "Segoe UI", system-ui, Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --text-xs: 12px;
+  --text-xs--line-height: 16px;
+  --text-sm: 13px;
+  --text-sm--line-height: 18px;
+  --text-base: 15px;
+  --text-base--line-height: 22px;
+  --text-lg: 17px;
+  --text-lg--line-height: 24px;
+  --text-xl: 22px;
+  --text-xl--line-height: 28px;
+  --text-2xl: 28px;
+  --text-2xl--line-height: 34px;
+
+  --radius-vg-sm: 6px;
+  --radius-vg-md: 10px;
+  --radius-vg-lg: 14px;
+
+  --shadow-vg-1: var(--vg-shadow-1);
+  --shadow-vg-2: var(--vg-shadow-2);
+
+  --color-vg-bg: var(--vg-bg);
+  --color-vg-surface: var(--vg-surface);
+  --color-vg-surface-raised: var(--vg-surface-raised);
+  --color-vg-surface-sunken: var(--vg-surface-sunken);
+  --color-vg-border: var(--vg-border);
+  --color-vg-border-strong: var(--vg-border-strong);
+  --color-vg-text: var(--vg-text);
+  --color-vg-text-secondary: var(--vg-text-secondary);
+  --color-vg-text-tertiary: var(--vg-text-tertiary);
+  --color-vg-accent: var(--vg-accent);
+  --color-vg-accent-fg: var(--vg-accent-fg);
+  --color-vg-focus-ring: var(--vg-focus-ring);
+  --color-vg-hover: var(--vg-hover);
+  --color-vg-selected: var(--vg-selected);
+  --color-vg-banner-bg: var(--vg-banner-bg);
+  --color-vg-banner-fg: var(--vg-banner-fg);
+  --color-vg-banner-border: var(--vg-banner-border);
+  --color-vg-zone-hazard: var(--vg-zone-hazard);
+  --color-vg-zone-restricted: var(--vg-zone-restricted);
+
+  --color-sev-critical-fg: var(--vg-sev-critical-fg);
+  --color-sev-critical-bg: var(--vg-sev-critical-bg);
+  --color-sev-critical-border: var(--vg-sev-critical-border);
+  --color-sev-medium-fg: var(--vg-sev-medium-fg);
+  --color-sev-medium-bg: var(--vg-sev-medium-bg);
+  --color-sev-medium-border: var(--vg-sev-medium-border);
+  --color-sev-low-fg: var(--vg-sev-low-fg);
+  --color-sev-low-bg: var(--vg-sev-low-bg);
+  --color-sev-low-border: var(--vg-sev-low-border);
+  --color-sev-uncertain-fg: var(--vg-sev-uncertain-fg);
+  --color-sev-uncertain-bg: var(--vg-sev-uncertain-bg);
+  --color-sev-uncertain-border: var(--vg-sev-uncertain-border);
+  --color-sev-neutral-fg: var(--vg-sev-neutral-fg);
+  --color-sev-neutral-bg: var(--vg-sev-neutral-bg);
+  --color-sev-neutral-border: var(--vg-sev-neutral-border);
+  --color-sev-clear-fg: var(--vg-sev-clear-fg);
+  --color-sev-clear-bg: var(--vg-sev-clear-bg);
+  --color-sev-clear-border: var(--vg-sev-clear-border);
+}
+
+.vg-hatch-stroke {
+  stroke: var(--vg-zone-hazard);
+}
+
+.vg-overlay-halo {
+  fill: none;
+  stroke: var(--vg-halo);
+  stroke-width: 5px;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.vg-person {
+  fill: transparent;
+  stroke-width: 2.5px;
+  vector-effect: non-scaling-stroke;
+  cursor: pointer;
+  outline: none;
+}
+
+.vg-person[data-selected="true"] {
+  stroke-width: 5px;
+}
+
+.vg-person:focus-visible {
+  stroke: var(--vg-focus-ring) !important;
+  stroke-width: 6px;
+  stroke-dasharray: 2 3;
+}
+
+.vg-person-fill {
+  fill: transparent;
+}
+
+.vg-person:hover {
+  fill: rgba(127, 127, 127, 0.12);
+}
+
+.vg-pointer-off .vg-person {
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vg-motion,
+  .vg-motion * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+@media print {
+  :root,
+  :root.dark {
+    --vg-bg: #ffffff;
+    --vg-surface: #ffffff;
+    --vg-surface-raised: #ffffff;
+    --vg-surface-sunken: #f2f2f4;
+    --vg-border: #c7c7cc;
+    --vg-border-strong: #6e6e73;
+    --vg-text: #1d1d1f;
+    --vg-text-secondary: #3a3a3c;
+    --vg-text-tertiary: #515157;
+    --vg-accent: #0068d9;
+    --vg-accent-fg: #ffffff;
+    --vg-halo: rgba(255, 255, 255, 0.92);
+    --vg-zone-hazard: #b45309;
+    --vg-zone-hazard-fill: rgba(180, 83, 9, 0.12);
+    --vg-zone-restricted: #4f6479;
+    --vg-zone-restricted-fill: rgba(79, 100, 121, 0.1);
+    --vg-banner-bg: #ffe08a;
+    --vg-banner-fg: #1d1d1f;
+    --vg-banner-border: #b86e00;
+    --vg-shadow-1: none;
+    --vg-shadow-2: none;
+    --vg-sev-critical-fg: #8e1b14;
+    --vg-sev-critical-bg: #fde7e5;
+    --vg-sev-critical-border: #d93025;
+    --vg-sev-medium-fg: #6e4300;
+    --vg-sev-medium-bg: #fff1d6;
+    --vg-sev-medium-border: #b86e00;
+    --vg-sev-low-fg: #2e4256;
+    --vg-sev-low-bg: #e4ebf2;
+    --vg-sev-low-border: #5b7187;
+    --vg-sev-uncertain-fg: #5b2a9c;
+    --vg-sev-uncertain-bg: #efe7fb;
+    --vg-sev-uncertain-border: #7d4cc4;
+    --vg-sev-neutral-fg: #3a3a3c;
+    --vg-sev-neutral-bg: #eeeef0;
+    --vg-sev-neutral-border: #8e8e93;
+    --vg-sev-clear-fg: #1e5c2e;
+    --vg-sev-clear-bg: #e3f4e7;
+    --vg-sev-clear-border: #2e7d42;
+    --vg-sev-critical-stroke: #d93025;
+    --vg-sev-medium-stroke: #b86e00;
+    --vg-sev-low-stroke: #4f6479;
+    --vg-sev-uncertain-stroke: #7d4cc4;
+    --vg-sev-neutral-stroke: #5c5c61;
+    --vg-sev-clear-stroke: #2e7d42;
+    color-scheme: light;
+  }
+
+  html,
+  body,
+  .h-screen,
+  .agent-native-app-main {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .vg-screen {
+    display: none !important;
+  }
+
+  .vg-print-report {
+    display: block !important;
+    color: var(--vg-text);
+    background: #ffffff;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

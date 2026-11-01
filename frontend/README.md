@@ -1,39 +1,26 @@
-# Vigilens Frontend
+# My App
 
-## Stack
-- React + Vite + JavaScript + plain CSS
-- Testing: Vitest + @testing-library/react (dev only)
+An app built with [Builder.io](https://www.builder.io) on the
+[Agent-Native](https://agent-native.com?utm_source=github&utm_medium=referral&utm_content=fusion-starter-readme) framework. Replace this paragraph with
+what the app does and who it's for.
 
-## Environment Variables
-- `VITE_AUDIT_MODE` (fixture|backend) — defaults to fixture mode if not set. In fixture mode only bundled samples work. In backend mode posts to API.
-- `VITE_API_BASE_URL` — base URL for backend (default: `http://localhost:8000`). Requests go to `{VITE_API_BASE_URL}/audit`.
+## Develop locally
 
-## Running Modes
+```bash
+cp .env.example .env
+corepack enable
+pnpm install
+pnpm dev
+```
 
-### Fixture Mode (default)
-1. Install dependencies: `npm install`
-2. Run dev server: `npm run dev`
-3. Use one of the bundled sample images with preset zones. Fixture results only load for matching bundled samples with preset zones.
+`.env.example` sets `AUTH_DISABLED=true` as a commented-out option; uncomment it
+to skip sign-in while developing.
 
-### Local Backend Mode
-1. Set environment variables (e.g. `.env`):
-   ```
-   VITE_AUDIT_MODE=backend
-   VITE_API_BASE_URL=http://localhost:8000
-   ```
-2. Ensure your local backend implements `POST /audit` per `CONTRACT.md` (v0.2-local-draft) and `GET /health`.
-3. Start the frontend: `npm run dev`
-4. Upload an image and draw zones; requests use `FormData` with `image` and `zones` (JSON string) and `Idempotency-Key` header. No manual `Content-Type` is set.
+## Project layout
 
-## Contract Pairing Test Assets
-Contract test assets are in `src/fixtures/contract/`:
-- `contract-sample.png` — real binary raster PNG (1280x720) for backend pairing
-- `contract-sample.svg` — SVG overlay reference
-- `contract-zones.json` — zones with exact structure (zone-1 Crane Zone hazard true, zone-2 Storage Yard hazard false)
-- `sample-audit-v0_2.json` — sample audit response
-- `index.js`, `README.md`
+- `app/`: routes and UI components
+- `actions/`: operations shared by the UI and the app's agent
+- `server/`: server plugins and the database client
+- `drizzle/`: schema and migrations; start with `drizzle/START_HERE.md`
 
-To pair with a local backend manifest, use `contract-sample.png` with `contract-zones.json` and expect the contract sample audit shape. The UI includes a backend-only "Contract test (backend pairing)" picker.
-
-## Demo Recording Note
-**Important:** Use licensed, real-world photos for the final hackathon demo recording. The bundled samples are synthetic and intended for development/testing only.
+Framework docs: [agent-native.com/docs](https://agent-native.com/docs?utm_source=github&utm_medium=referral&utm_content=fusion-starter-readme).

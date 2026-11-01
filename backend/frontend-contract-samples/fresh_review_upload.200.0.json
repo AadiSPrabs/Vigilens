@@ -1,0 +1,286 @@
+{
+ "accounting_settlement": null,
+ "actual_debit": "unchecked",
+ "attempted_provider_calls_total": 2,
+ "binding": {
+  "canonical_png_sha256": "56c12ebac2e340542d3abe397fa50b47f3a114c952a571afb532553fc3ab9007",
+  "carry_sha256": "3a588681581d5fa41c8416715918a6a3e24d015438db2bfe8bf8a0569a2d2e56",
+  "export_allowed": false,
+  "frame_size": [
+   320,
+   334
+  ],
+  "max_people": 2,
+  "persons": [
+   {
+    "box_half_open": [
+     211,
+     228,
+     271,
+     255
+    ],
+    "id": "0",
+    "mask": {
+     "box_half_open_pixels": [
+      211,
+      228,
+      271,
+      255
+     ],
+     "coordinate_basis": "original_upright_source_pixels",
+     "counts": [
+      5,
+      49,
+      9,
+      53,
+      6,
+      55,
+      4,
+      57,
+      3,
+      58,
+      1,
+      59,
+      1,
+      59,
+      1,
+      59,
+      1,
+      179,
+      1,
+      59,
+      1,
+      59,
+      1,
+      59,
+      1,
+      59,
+      1,
+      59,
+      1,
+      59,
+      1,
+      59,
+      1,
+      59,
+      1,
+      59,
+      1,
+      59,
+      2,
+      58,
+      2,
+      57,
+      4,
+      56,
+      5,
+      54,
+      7,
+      51,
+      12,
+      45,
+      8
+     ],
+     "encoding": "binary_rle_row_major_v1",
+     "foreground_value": 1,
+     "lossless": true,
+     "origin_pixels": [
+      211,
+      228
+     ],
+     "pixel_sha256": "47ef09855c03b19ee7267574e09b09d5860f9f8fe9aca85609b989740059fa09",
+     "size": [
+      60,
+      27
+     ],
+     "source_frame_size": [
+      320,
+      334
+     ],
+     "starts_with": 0
+    }
+   }
+  ],
+  "ppe_max_output_tokens": 512,
+  "ppe_model": "muse-spark-1.3",
+  "sam_model": "sam-3.1",
+  "sam_request_sha256": "6233c2f2f5f66abfc302638289e44c6144af0799456b1305ba3678e3e79a89b6",
+  "source_approval_reference": "generated-only",
+  "source_approval_snapshot": {
+   "provenance": {
+    "owner_instruction_reference": "synthetic-no-owner-grant",
+    "reviewed_at": "synthetic",
+    "reviewer": "smoke-harness",
+    "rights_review_reference": "generated-only",
+    "scope": "synthetic_local_qualification"
+   },
+   "provider_upload_approved": true,
+   "rights_reference": "generated-only",
+   "size": [
+    320,
+    334
+   ]
+  },
+  "source_digest": "c04ceef86c178f47708c94cf1a0c829ebd88e5c0610202e6caa14a804d140e95",
+  "zone_policy": "not_applied",
+  "zones": []
+ },
+ "evidence_export_allowed": false,
+ "execution_status": "completed_provider_observations",
+ "known_listed_usd": "0.0028375",
+ "provider_call_count_status": "attempts_recorded_debit_unchecked",
+ "provider_calls_this_request": 2,
+ "requires_operator_reconciliation": false,
+ "reservation_usd": "2.627012",
+ "result": {
+  "compliance_status": "not_evaluated",
+  "evidence_export_allowed": false,
+  "findings": null,
+  "image": {
+   "height": 334,
+   "pixel_digest": "c04ceef86c178f47708c94cf1a0c829ebd88e5c0610202e6caa14a804d140e95",
+   "width": 320
+  },
+  "persons": [
+   {
+    "box_half_open": [
+     211,
+     228,
+     271,
+     255
+    ],
+    "compliance_status": "not_evaluated",
+    "contact_status": "not_checked",
+    "crop_eligibility": {
+     "eligible_for_selected_crop_call": false,
+     "identity_or_visibility_validated": false,
+     "limits_applied": {
+      "min_crop_height": 64,
+      "min_crop_width": 32,
+      "source": "WideLimits defaults; technical threshold, not accuracy validation"
+     },
+     "recorded_by": "single_upload_same_eligibility_function",
+     "review_reasons": [
+      "crop_too_small_for_configured_evidence_threshold"
+     ]
+    },
+    "crop_png_sha256": "a732e04755d98eb7d1029de9d0c1d5c32de0ef473a3627b5b910798bc96283c7",
+    "helmet": "unknown",
+    "id": "0",
+    "mask": {
+     "box_half_open_pixels": [
+      211,
+      228,
+      271,
+      255
+     ],
+     "coordinate_basis": "original_upright_source_pixels",
+     "counts": [
+      5,
+      49,
+      9,
+      53,
+      6,
+      55,
+      4,
+      57,
+      3,
+      58,
+      1,
+      59,
+      1,
+      59,
+      1,
+      59,
+      1,
+      179,
+      1,
+      59,
+      1,
+      59,
+      1,
+      59,
+      1,
+      59,
+      1,
+      59,
+      1,
+      59,
+      1,
+      59,
+      1,
+      59,
+      1,
+      59,
+      1,
+      59,
+      2,
+      58,
+      2,
+      57,
+      4,
+      56,
+      5,
+      54,
+      7,
+      51,
+      12,
+      45,
+      8
+     ],
+     "encoding": "binary_rle_row_major_v1",
+     "foreground_value": 1,
+     "lossless": true,
+     "origin_pixels": [
+      211,
+      228
+     ],
+     "pixel_sha256": "47ef09855c03b19ee7267574e09b09d5860f9f8fe9aca85609b989740059fa09",
+     "size": [
+      60,
+      27
+     ],
+     "source_frame_size": [
+      320,
+      334
+     ],
+     "starts_with": 0
+    },
+    "ppe_assessed": true,
+    "ppe_request_sha256": "5b1ef27f4dd025f6785d9d886ff5b5e6cb2f141945a1d11eb6ca0eae3f76bcc5",
+    "ppe_response_id": "synthetic-ppe",
+    "provider_observation": {
+     "accuracy_status": "not_validated",
+     "actual_debit": "unchecked",
+     "evidence_export_allowed": false,
+     "listed_cost_usd": "0.0003375",
+     "model": "muse-spark-1.3",
+     "observation": {
+      "helmet": "unknown",
+      "helmet_evidence": "generated pixels",
+      "vest": "unknown",
+      "vest_evidence": "generated pixels"
+     },
+     "provider_revision": "not_returned",
+     "response_id": "synthetic-ppe",
+     "response_sha256": "5ee5a1a1d83bac6dc729a013301a099970f4ec35a45809530995a5e89f984f3d",
+     "usage": {
+      "input_tokens": 100,
+      "output_tokens": 50
+     }
+    },
+    "vest": "unknown"
+   }
+  ],
+  "privacy_review_status": "not_validated",
+  "provider_proof": "local_request_response_consistency_not_provider_signature",
+  "review_status": "needs_human_review",
+  "sam_request_sha256": "6233c2f2f5f66abfc302638289e44c6144af0799456b1305ba3678e3e79a89b6",
+  "sam_response_id": "synthetic-sam",
+  "source": "fresh_upload_provider_review",
+  "zone_status": "not_checked",
+  "zones": []
+ },
+ "retry_allowed": false,
+ "state": "completed"
+}

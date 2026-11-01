@@ -1,0 +1,275 @@
+{
+ "assessment_id": "fresh:c04ceef86c178f47708c94cf1a0c829ebd88e5c0610202e6caa14a804d140e95:18a0824c86eebe4e9d23a962b1db9b1fb55464ae4f24043f2ae0ba84598248fa",
+ "assessment_source": "fresh_upload_provider_review",
+ "automatic_contact": false,
+ "compliance_decision": false,
+ "configured_rule_review": {
+  "application_status": "local_configuration_evaluation_not_approved_release",
+  "approval_status": "not_verified_by_configuration",
+  "camera_binding": "operator_label_only_not_verified_camera_reuse",
+  "camera_id": "generated-label-not-calibration",
+  "configuration_event_id": 1,
+  "configuration_scope": "illustrative_demo",
+  "evidence_export_allowed": false,
+  "observation_basis": "private_report_visible_observations",
+  "persons": [
+   {
+    "compliant": null,
+    "evaluations": [
+     {
+      "priority": null,
+      "rating_status": "not_configured_needs_review",
+      "reason": "presence_in_no_entry_area_not_crossing",
+      "rule_id": "generated-entry",
+      "status": "observed_violation",
+      "zone_id": "generated-zone"
+     }
+    ],
+    "findings": [
+     {
+      "priority": null,
+      "rating_status": "not_configured_needs_review",
+      "reason": "presence_in_no_entry_area_not_crossing",
+      "rule_id": "generated-entry",
+      "status": "observed_violation",
+      "zone_id": "generated-zone"
+     }
+    ],
+    "highest_configured_priority": null,
+    "needs_review": true,
+    "person_id": "0",
+    "safe": null,
+    "summary": "needs_review"
+   }
+  ],
+  "policy_id": "generated-only",
+  "policy_sha256": "56584543d8ee1329704b5797b81b569c65da7a369aebef307179c57a9d459b14",
+  "position_basis": "current_manual_contact_claims",
+  "provider_calls_this_request": 0,
+  "regulatory_compliance_claim": false,
+  "report_visible_observations": [
+   {
+    "helmet": "unknown",
+    "id": "0",
+    "vest": "unknown"
+   }
+  ],
+  "result_sha256": "18a0824c86eebe4e9d23a962b1db9b1fb55464ae4f24043f2ae0ba84598248fa",
+  "scope": "illustrative_demo",
+  "source_digest": "c04ceef86c178f47708c94cf1a0c829ebd88e5c0610202e6caa14a804d140e95",
+  "status": "private_operator_rules_evaluated_not_safety_clearance",
+  "version": "1",
+  "zones_sha256": "8333903332c23a98eb2c91865069f09338edeec151580f199a1b3379c2fde93e"
+ },
+ "contact_review_status": "operator_claims_only",
+ "current_assessment_binding": null,
+ "deliberate_rechecks": {
+  "attempts": [],
+  "original_result_unchanged": true,
+  "status": "not_configured"
+ },
+ "derivative_sha256": "042d6f580e0dbce5eac5ee29fff177b4a59ee871699f45fa68a262398b8bd19b",
+ "evidence_export_allowed": false,
+ "face_covering_assurance": "operator_visual_claim_not_privacy_validation",
+ "face_covering_review": [],
+ "manual_contact_review": {
+  "0": {
+   "at": 1793254397.665479,
+   "claim": {
+    "basis": "original_source_and_person_mask_operator_claim",
+    "compliance_status": "not_evaluated",
+    "face_coverage_approved": false,
+    "point": [
+     0.6815625,
+     0.7607784431137724
+    ],
+    "reviewer_label": "synthetic claim not actual boots",
+    "zone_status": "not_checked"
+   },
+   "event_id": 1
+  }
+ },
+ "notice": "Faces-in-reports requirement still needs reliable coverage/release validation. This private preview is not safe-to-share evidence.",
+ "persons": [
+  {
+   "crop_eligibility": {
+    "eligible_for_selected_crop_call": false,
+    "identity_or_visibility_validated": false,
+    "limits_applied": {
+     "min_crop_height": 64,
+     "min_crop_width": 32,
+     "source": "WideLimits defaults; technical threshold, not accuracy validation"
+    },
+    "recorded_by": "single_upload_same_eligibility_function",
+    "review_reasons": [
+     "crop_too_small_for_configured_evidence_threshold"
+    ]
+   },
+   "evidence_review": {
+    "automatic_privacy_clearance": false,
+    "derivative_sha256": "042d6f580e0dbce5eac5ee29fff177b4a59ee871699f45fa68a262398b8bd19b",
+    "derived_helmet_verdict": null,
+    "display_finding_allowed": false,
+    "evidence_export_allowed": false,
+    "evidence_status": "needs_human_review",
+    "input_helmet_observation": "unknown",
+    "notice": "Operator evidence sufficiency only, not model verification, anonymity or release approval.",
+    "person_id": "0",
+    "privacy_review_status": "not_validated",
+    "regions_digest": "286c07918793931fece9bca34fea7c097aec4dcea163b8f1b86811aa78ce59fe",
+    "source": "offline_operator_evidence_review",
+    "source_digest": "c04ceef86c178f47708c94cf1a0c829ebd88e5c0610202e6caa14a804d140e95"
+   },
+   "geometry_status": "mask_verified",
+   "person_id": "0",
+   "ppe_assessed": true,
+   "ppe_basis": {
+    "crop_basis": "crop_rule_ineligible",
+    "crop_rule_reasons": [
+     "crop_too_small_for_configured_evidence_threshold"
+    ],
+    "items": {
+     "helmet": {
+      "item_resolved": false,
+      "provider_observation": "unknown",
+      "resolved_state": "unknown",
+      "target_attribution": "unresolved_partial_evidence",
+      "target_level_outcome_permitted": false
+     },
+     "vest": {
+      "item_resolved": false,
+      "provider_observation": "unknown",
+      "resolved_state": "unknown",
+      "target_attribution": "unresolved_partial_evidence",
+      "target_level_outcome_permitted": false
+     }
+    }
+   },
+   "ppe_evidence_status": "provider_observed",
+   "provider_helmet_observation": "unknown",
+   "provider_vest_observation": "unknown",
+   "report_display_helmet": "unknown",
+   "report_display_vest": "unknown",
+   "status": "needs_human_review",
+   "vest_evidence_review": {
+    "basis": "operator_evidence_claim_only",
+    "display_finding_allowed": false,
+    "torso_evidence_visible": false
+   }
+  }
+ ],
+ "ppe_basis_counts": {
+  "attempted_clean_rule_both_items_unknown_count": 0,
+  "attempted_is_not_resolved_assessment": true,
+  "attribution_unresolved_partial_count": 1,
+  "counts_are_not_the_10_plus_qualification": true,
+  "detected_count": 1,
+  "emitted_is_not_resolved": true,
+  "fully_resolved_person_count": 0,
+  "legacy_basis_not_recorded_count": 0,
+  "legacy_field_semantics": "PPE_assessed_count, all_detected_people_assessed and ppe_assessed (older names, kept unchanged for compatibility) mean provider observation attempted, not a resolved assessment",
+  "legacy_outcome_withheld_count": 0,
+  "outcome_emitted_clean_rule_count": 0,
+  "outcome_emitted_count": 0,
+  "provider_observation_attempted_count": 1,
+  "resolved_item_count": 0,
+  "resolved_means": "both helmet and vest known (present or absent) on a clean_crop proven by the stored eligibility record; still an unvalidated provider reading, not safe or compliant",
+  "target_level_outcome_permitted_count": 0
+ },
+ "ppe_cross_stage_review": {
+  "automatic_dispatch": false,
+  "original_observations_unchanged": true,
+  "signals": [],
+  "status": "cross_stage_signals_not_ppe_verdict"
+ },
+ "ppe_segmentation": {
+  "batches": [],
+  "status": "not_configured"
+ },
+ "ppe_stage": null,
+ "ppe_summary_status": "preserved_provider_observations",
+ "privacy_review_status": "not_validated",
+ "regions_digest": "286c07918793931fece9bca34fea7c097aec4dcea163b8f1b86811aa78ce59fe",
+ "sam_configuration": null,
+ "sam_configuration_sha256": null,
+ "source": "private_report_preview_not_released",
+ "source_digest": "c04ceef86c178f47708c94cf1a0c829ebd88e5c0610202e6caa14a804d140e95",
+ "spatial_explanations": {
+  "attempts": [],
+  "status": "not_configured"
+ },
+ "status": "needs_human_review",
+ "whole_frame_operator_review": {
+  "ack": {
+   "background_checked": true,
+   "derivative_checked": true,
+   "foreground_checked": true,
+   "frame_size": [
+    320,
+    334
+   ],
+   "output_sha256": "042d6f580e0dbce5eac5ee29fff177b4a59ee871699f45fa68a262398b8bd19b",
+   "reflections_checked": true,
+   "regions_digest": "286c07918793931fece9bca34fea7c097aec4dcea163b8f1b86811aa78ce59fe",
+   "source_digest": "c04ceef86c178f47708c94cf1a0c829ebd88e5c0610202e6caa14a804d140e95"
+  },
+  "basis": "operator_claim_only_not_detector_coverage",
+  "checked": true
+ },
+ "wide_scene": null,
+ "zone_review": {
+  "automatic_contact": false,
+  "compliance_status": "not_evaluated",
+  "contract_version": "vigilens.zone-review.proposal.v1",
+  "evidence_export_allowed": false,
+  "persons": [
+   {
+    "basis": "operator_zones_and_current_manual_contact_not_automatic",
+    "contact_event_id": 1,
+    "display_zone_id": "generated-zone",
+    "person_id": "0",
+    "safety_decision": false,
+    "status": "operator_contact_geometry",
+    "zone_ids": [
+     "generated-zone"
+    ]
+   }
+  ],
+  "policy_status": "not_applied",
+  "privacy_review_status": "not_validated",
+  "provider_calls_this_request": 0,
+  "result_sha256": "18a0824c86eebe4e9d23a962b1db9b1fb55464ae4f24043f2ae0ba84598248fa",
+  "source_digest": "c04ceef86c178f47708c94cf1a0c829ebd88e5c0610202e6caa14a804d140e95",
+  "zone_snapshot": {
+   "at": 1793254397.6971009,
+   "event_id": 1,
+   "reviewer_label": "synthetic operator",
+   "zones": [
+    {
+     "hazard": true,
+     "id": "generated-zone",
+     "name": "Generated geometry only",
+     "points": [
+      {
+       "x": 0.01,
+       "y": 0.01
+      },
+      {
+       "x": 0.99,
+       "y": 0.01
+      },
+      {
+       "x": 0.99,
+       "y": 0.99
+      },
+      {
+       "x": 0.01,
+       "y": 0.99
+      }
+     ]
+    }
+   ],
+   "zones_sha256": "8333903332c23a98eb2c91865069f09338edeec151580f199a1b3379c2fde93e"
+  }
+ }
+}

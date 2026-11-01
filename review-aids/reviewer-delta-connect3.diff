@@ -1,0 +1,468 @@
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' vigilens-connect-2/INTEGRATION-README.md /tmp/cand/vigilens-connect-3/INTEGRATION-README.md
+--- vigilens-connect-2/INTEGRATION-README.md	2026-10-31 22:36:13.000000000 +0530
++++ /tmp/cand/vigilens-connect-3/INTEGRATION-README.md	2026-10-31 22:56:35.161144927 +0530
+@@ -1,4 +1,7 @@
+-# Vigilens - connected demo (integration snapshot 1)
++# Vigilens - connected demo (integration snapshot 3)
++
++Snapshot 3 is a reviewer repair delta on snapshot 2 (same origins, plus the fixes listed
++under "Snapshot 3 delta" below). Snapshots 1-2 remain frozen; this is the candidate.
+ 
+ The frontend-builder UI connected to the governed Vigilens backend, in one working copy.
+ Built from `feat/frontend-builder` @970e39c (untouched upstream) plus the draft6 backend.
+@@ -16,6 +19,13 @@
+ - Honesty labeling: synthetic results show "SYNTHETIC READINGS - boxes and PPE values are
+   generated test data, not detections". The offline transport's person boxes are generated
+   from request bytes, not detected from the photo; the UI says so.
++- Bad uploads say why: an oversize, EXIF-rotated or unsupported image now returns its exact
++  status (413 IMAGE_TOO_LARGE / 415 UNSUPPORTED_MEDIA_TYPE / 422 IMAGE_ORIENTATION_UNSUPPORTED
++  or IMAGE_UNREADABLE) with an operator-safe message, instead of a generic "unapproved" 409.
++  A rotated phone photo must be rotated upright before upload; nothing was sent anywhere.
++- `dev_install.py approve` while the seamless server runs: the CLI takes the same advisory
++  lockfile as the server and advances the sidecar pin, so the running server re-syncs on its
++  next lookup - no restart, no lost recordings either direction.
+ 
+ ## Run it (Linux/macOS dev machine)
+ 
+@@ -53,7 +63,14 @@
+ 
+ ## Tests
+ 
+-    cd backend && python -m pytest tests -q   # 762 passed (Linux, clean shell)
++    cd backend && python -m pytest tests -q   # 770 passed (Linux, clean shell)
++
++Frontend: the 10 governed-client/adapter tests pass (`npx vitest run
++app/vigilens/api/__tests__/backendClient.test.ts` after `npm ci`). The FULL `npm test` is
++NOT green as shipped: two untouched builder-template (@970e39c) scaffold spec files fail
++(tests/use-navigation-state.spec.ts: 7 failures, spec/API drift `pathForCommand is not a
++function`; server/mcp-provider-schemas.spec.ts: generated-registry resolution). Both are
++pre-existing template debt off the Vigilens route; no Vigilens test fails.
+ 
+ New coverage for this integration: seamless approval recording (record-on-miss, pin
+ rebind, no-overwrite, concurrent single-writer, restart via sidecar pin), multi-image
+@@ -61,6 +78,47 @@
+ over a fake-HTTP boundary (exact frontend multipart request, live-origin labelling,
+ provider-error hold with no retry).
+ 
++Snapshot 3 delta coverage (backend/tests/test_review_delta.py, 5 tests): exact 413/415/422
++image-error mapping on the governed route (rotated image refused before any approval
++recording), lock-unavailable fails closed (nothing recorded unlocked), CLI approve
++serializes with the running seamless server and the server re-syncs without restart.
++
++## Snapshot 3 delta (reviewer repairs on frozen snapshot 2)
++
++- dev_install.py `--seamless` help text corrected: it wrongly claimed the flag is "never
++  valid with the meta transport". Seamless+meta is supported and records LIVE-scope
++  upload-as-approval that spends the configured key; the help now says so.
++- Governed/frontend-audit upload routes: image-input AuditErrors keep their exact status
++  and code instead of collapsing into a generic 409; the frontend surfaces the message.
++- demo_approvals.py cross-process lock: if no locking mechanism exists or the lock cannot
++  be acquired, recording is REFUSED (fail closed); it never runs unlocked.
++- dev_install.py `approve`: takes the same lockfile, writes approvals/config atomically
++  (temp + fsync + replace), and advances the seamless sidecar pin.
++- Two pre-existing tests that pinned the old masked statuses were updated to the exact
++  statuses with their intent preserved (valid image exercises the dispatch gate; invalid
++  zones assert the exact 400 INVALID_* code before any lookup).
++
++## Limits and recovery (read before the demo)
++
++- Journal bound: an install holds at most 64 distinct analysed images; the 65th upload is
++  refused (409). This is a hard stop, not an error. Do NOT delete state or create a fresh
++  install to keep going: a new install starts with fresh budget while the old spend and
++  holds still exist, which would defeat the accounting. Reconcile against the ORIGINAL
++  journal/carry (operator step) or stop there for the demo.
++- Crash mid-recording: an upload interrupted between file write and pin write fails closed
++  afterwards (409s) until repaired. Repair means restoring consistency between
++  approvals.json and approvals.recorded-sha256 (both are plain JSON/text; the sidecar must
++  name the sha256 of the approvals file). Never delete or reset the journal
++  (dev.sqlite), carry.json or any ledger file: they are the only spending record.
++- Spending visibility is journal-only: there is no UI or endpoint for cumulative spend.
++  To inspect it on the demo machine:
++      sqlite3 state/dev.sqlite "SELECT source, state, reserved, cost FROM jobs;"
++      sqlite3 state/dev.sqlite "SELECT source, ordinal, model, state, cost FROM calls;"
++  (`sqlite3` CLI, or any SQLite browser, read-only.)
++- Windows remains UNVERIFIED as shipped: the backend's Win32 privacy/no-follow code has
++  never executed on Windows (run windows_preflight.py first and require a PASS), and the
++  agent-native frontend toolchain has never been run on Windows (WSL2 escape route above).
++
+ ## Review aids
+ 
+ `review-aids/` contains diffs against the two origins (draft6 backend, frontend-builder
+@@ -93,6 +151,7 @@
+ 
+ Seamless-store failure contract (short version, full text in demo_approvals.py):
+ recordings are atomic (temp + fsync + replace) with a sidecar pin; a crash mid-record fails
+-closed on restart, never half-trusted; concurrent processes on one state dir serialize
+-through an advisory lockfile; peer recordings are re-synced only when file and sidecar match
+-under the lock.
++closed on restart, never half-trusted; concurrent processes on one state dir (two servers,
++or a server and the CLI approval tool) serialize through one advisory lockfile; if locking
++is unavailable the recording is refused, never performed unlocked; peer recordings and CLI
++approvals are re-synced only when file and sidecar match under the lock.
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' vigilens-connect-2/backend/dev_install.py /tmp/cand/vigilens-connect-3/backend/dev_install.py
+--- vigilens-connect-2/backend/dev_install.py	2026-10-31 22:29:29.000000000 +0530
++++ /tmp/cand/vigilens-connect-3/backend/dev_install.py	2026-10-31 22:56:54.025270712 +0530
+@@ -54,8 +54,36 @@
+     return json.loads(path.read_bytes())['approvals']
+ 
+ 
++def _atomic_private_write(path, raw):
++    """Temp file + fsync + os.replace, 0600: no half-written state is ever visible."""
++    tmp = path.with_name(path.name + '.tmp-' + secrets.token_hex(4))
++    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
++    try:
++        with os.fdopen(fd, 'wb') as f:
++            f.write(raw)
++            f.flush()
++            os.fsync(f.fileno())
++        os.replace(tmp, path)
++        path.chmod(0o600)
++    except BaseException:
++        try:
++            os.unlink(tmp)
++        except OSError:
++            pass
++        raise
++
++
+ def approve_image(state_dir, image_path, scope='synthetic_local_qualification'):
+-    """Add or refresh the per-install source approval for one developer test image. Offline."""
++    """Add or refresh the per-install source approval for one developer test image. Offline.
++
++    Serialized with a running seamless server through the same advisory lockfile
++    (fresh_review.demo_approvals._cross_process_lock; fails closed when locking is
++    unavailable), so a CLI approval cannot lose a concurrent upload recording or be
++    lost by one. The approval file and config pin are written atomically. On a
++    seamless install the recorded-sidecar pin is advanced to the merged state, so a
++    running seamless server re-syncs on its next lookup instead of failing closed
++    until restart. Accounting (carry/journal) is never touched here."""
++    from fresh_review.demo_approvals import _cross_process_lock
+     state = Path(state_dir)
+     approvals_path = state / 'approvals.json'
+     config_path = state / 'dev-config.json'
+@@ -63,12 +91,18 @@
+         raise ValueError('Run dev_install.py setup first')
+     raw = Path(image_path).read_bytes()
+     frame = decode_image(raw, 'image/png') if not str(image_path).lower().endswith(('.jpg', '.jpeg')) else decode_image(raw, 'image/jpeg')
+-    approvals = _read_approvals(approvals_path)
+-    approvals[frame.digest] = _approval_spec(frame.width, frame.height, scope)
+-    _private_write(approvals_path, (json.dumps({'version': 1, 'approvals': approvals}, sort_keys=True) + '\n').encode())
+-    config = json.loads(config_path.read_bytes())
+-    config['approval_sha256'] = hashlib.sha256(approvals_path.read_bytes()).hexdigest()
+-    _private_write(config_path, (json.dumps(config, indent=2, sort_keys=True) + '\n').encode())
++    with _cross_process_lock(approvals_path):
++        approvals = _read_approvals(approvals_path)
++        approvals[frame.digest] = _approval_spec(frame.width, frame.height, scope)
++        new_raw = (json.dumps({'version': 1, 'approvals': approvals}, sort_keys=True) + '\n').encode()
++        _atomic_private_write(approvals_path, new_raw)
++        new_sha = hashlib.sha256(new_raw).hexdigest()
++        config = json.loads(config_path.read_bytes())
++        config['approval_sha256'] = new_sha
++        _atomic_private_write(config_path, (json.dumps(config, indent=2, sort_keys=True) + '\n').encode())
++        if config.get('seamless_upload_approval') is True:
++            sidecar = approvals_path.with_name('approvals.recorded-sha256')
++            _atomic_private_write(sidecar, (new_sha + '\n').encode())
+     return frame.digest
+ 
+ 
+@@ -168,8 +202,11 @@
+     if type(cap_enforcement) is not bool:
+         raise ValueError('Explicit cap_enforcement boolean required when present')
+     if cap_enforcement is False and transport == 'meta':
+-        # Owner direction (Aadi, demo steering): the app tracks spending but does not enforce a
+-        # second app-level budget gate; the spending stop is the provider-side key limit. The
++        # Tracking-only mode: the app records all spending but does not enforce a second
++        # app-level budget gate; the spending stop is then the provider-side key limit
++        # (alert-only for Meta, per the README link - NOT a hard stop). This mode requires an
++        # explicit, current owner decision; no such decision is recorded in this package, so
++        # leave the default (enforcement on) unless the owner has just said otherwise. The
+         # ledger keeps booking every reservation and cost in full; only the refusal is off.
+         print('note: cap_enforcement=false - aggregate cap is tracked, not enforced; the provider-side key limit is the spending stop', file=sys.stderr)
+     service = FreshPipeline(config['journal'], execution_scope=scope,
+@@ -189,7 +226,7 @@
+     p.add_argument('--state-dir', required=True)
+     p.add_argument('--image', action='append', default=[], help='test image to approve (repeatable); PNG or JPEG')
+     p.add_argument('--origin', action='append', default=[], help='allowed loopback frontend origin, e.g. http://localhost:5173 (repeatable)')
+-    p.add_argument('--seamless', action='store_true', help='setup: seamless demo flow - the upload action is recorded as the synthetic-scope approval at upload time (no per-image CLI approval or restart). Offline synthetic mode only; never valid with the meta transport.')
++    p.add_argument('--seamless', action='store_true', help='setup: seamless demo flow - the upload action is recorded as the approval at upload time (no per-image CLI approval or restart). Synthetic installs record synthetic scope (offline). With --transport meta at serve time the same flag records LIVE scope: upload-as-approval spends the configured key for real - enable only deliberately, exactly as the README documents.')
+     p.add_argument('--cap', default='5', help='setup: per-install aggregate budget cap in listed USD, sha-pinned into the install carry checkpoint (default 5; for live use set only an owner-approved limit)')
+     p.add_argument('--scope', default='synthetic_local_qualification', choices=SCOPES, help='approve: approval scope; live provider testing needs private_provider_processing')
+     a = p.parse_args()
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' vigilens-connect-2/backend/fresh_review/api.py /tmp/cand/vigilens-connect-3/backend/fresh_review/api.py
+--- vigilens-connect-2/backend/fresh_review/api.py	2026-10-31 22:29:29.000000000 +0530
++++ /tmp/cand/vigilens-connect-3/backend/fresh_review/api.py	2026-10-31 22:51:57.879302361 +0530
+@@ -38,7 +38,8 @@
+             return await SERVICE.run(raw,image.content_type,z)
+         except HTTPException:raise
+         except LiveTransportDisabled:raise HTTPException(503,'Fresh provider execution disabled; no claim or call created')
+-        except (ValueError,KeyError,TypeError,OSError,sqlite3.Error,AuditError):raise HTTPException(409,'Fresh source/config/accounting unavailable or unapproved; no automatic retry')
++        except AuditError:raise
++        except (ValueError,KeyError,TypeError,OSError,sqlite3.Error):raise HTTPException(409,'Fresh source/config/accounting unavailable or unapproved; no automatic retry')
+ 
+     @router.post('/fresh-review-clip-upload')
+     async def clip_upload(clip:UploadFile=File(...),offsets:str=Form(...),x_vigilens_display_session:str=Header('')):
+@@ -76,7 +77,8 @@
+             BOUND.add((x_vigilens_display_session,frame.digest))
+             out['zones_applied']=False;out['zones_semantics']='Posted zones are validated and echoed only. The stored result was produced without zones: no zone membership was determined (no ground-contact review exists), every person is unknown for every zone, and zones_applied=false means no zone check happened.'
+             return out
+-        except (ValueError,KeyError,TypeError,OSError,sqlite3.Error,AuditError):raise HTTPException(409,'No presentable stored result for this exact image (none stored, or not safe to present); new-image analysis is not enabled here')
++        except AuditError:raise
++        except (ValueError,KeyError,TypeError,OSError,sqlite3.Error):raise HTTPException(409,'No presentable stored result for this exact image (none stored, or not safe to present); new-image analysis is not enabled here')
+ 
+     @router.get('/fresh-review/{source}')
+     async def status(source:str):
+@@ -472,7 +474,8 @@
+             return out
+         except HTTPException:raise
+         except LiveTransportDisabled:raise HTTPException(503,'Fresh provider execution disabled; no claim or call created')
+-        except (ValueError,KeyError,TypeError,OSError,sqlite3.Error,AuditError):raise HTTPException(409,'Fresh source/config/accounting unavailable, unapproved or not presentable; no automatic retry')
++        except AuditError:raise
++        except (ValueError,KeyError,TypeError,OSError,sqlite3.Error):raise HTTPException(409,'Fresh source/config/accounting unavailable, unapproved or not presentable; no automatic retry')
+ 
+     @router.get('/fresh-review/{source}/frontend-audit')
+     async def frontend_audit(source:str,x_vigilens_display_session:str=Header('')):
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' vigilens-connect-2/backend/fresh_review/demo_approvals.py /tmp/cand/vigilens-connect-3/backend/fresh_review/demo_approvals.py
+--- vigilens-connect-2/backend/fresh_review/demo_approvals.py	2026-10-31 22:36:13.000000000 +0530
++++ /tmp/cand/vigilens-connect-3/backend/fresh_review/demo_approvals.py	2026-10-31 22:51:57.879302361 +0530
+@@ -51,15 +51,24 @@
+     try:
+         try:
+             import fcntl
+-            fcntl.flock(fd, fcntl.LOCK_EX)
+         except ImportError:
++            fcntl = None
++        if fcntl is not None:
++            try:
++                fcntl.flock(fd, fcntl.LOCK_EX)
++            except OSError as e:
++                raise ValueError('Cross-process approval lock could not be acquired; refusing rather than recording unlocked') from e
++        else:
+             try:
+                 import msvcrt
+-                os.write(fd, b' ' if os.lseek(fd, 0, os.SEEK_END) == 0 else b'')
+-                os.lseek(fd, 0, os.SEEK_SET)
++            except ImportError as e:
++                raise ValueError('No cross-process locking mechanism on this platform; failing closed, never recording unlocked') from e
++            os.write(fd, b' ' if os.lseek(fd, 0, os.SEEK_END) == 0 else b'')
++            os.lseek(fd, 0, os.SEEK_SET)
++            try:
+                 msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+-            except (ImportError, OSError):
+-                pass
++            except OSError as e:
++                raise ValueError('Cross-process approval lock could not be acquired; refusing rather than recording unlocked') from e
+         yield
+     finally:
+         try:
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' vigilens-connect-2/backend/fresh_review/pipeline.py /tmp/cand/vigilens-connect-3/backend/fresh_review/pipeline.py
+--- vigilens-connect-2/backend/fresh_review/pipeline.py	2026-10-31 22:29:29.000000000 +0530
++++ /tmp/cand/vigilens-connect-3/backend/fresh_review/pipeline.py	2026-10-31 22:51:57.879302361 +0530
+@@ -3,7 +3,7 @@
+ from decimal import Decimal as D
+ from pathlib import Path
+ from PIL import Image
+-from core import decode_image,pixel_only_png
++from core import AuditError,decode_image,pixel_only_png
+ from private_sqlite import require_private_file
+ from pipeline import Frame
+ from adapters import build_sam_image_request,LiveTransportDisabled
+@@ -182,7 +182,7 @@
+         if zones!=[]:raise ValueError('Fresh preparation supports no-zone policy only')
+         frame=decode_image(raw,mime)
+         self.reject_derivative(frame.digest)
+-        if frame.orientation!=1:raise ValueError('Explicit upright input required')
++        if frame.orientation!=1:raise AuditError(422,'IMAGE_ORIENTATION_UNSUPPORTED','Normalize EXIF orientation before uploading (rotate the photo upright first); no claim or call was created.')
+         spec=self.approval_store.lookup(frame.digest,[frame.width,frame.height])
+         if spec['provenance']['scope']!=self.execution_scope:raise ValueError('Approval scope differs from execution scope')
+         carry=self.carry()
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' vigilens-connect-2/backend/tests/test_fresh_upload_routes.py /tmp/cand/vigilens-connect-3/backend/tests/test_fresh_upload_routes.py
+--- vigilens-connect-2/backend/tests/test_fresh_upload_routes.py	2026-10-31 22:29:29.000000000 +0530
++++ /tmp/cand/vigilens-connect-3/backend/tests/test_fresh_upload_routes.py	2026-10-31 22:54:26.688289317 +0530
+@@ -65,7 +65,10 @@
+ def test_route_default_not_general_live_enabled(tmp_path,monkeypatch):
+  from fresh_review.pipeline import FreshPipeline
+  p=FreshPipeline(tmp_path/'disabled.sqlite')
+- c=TestClient(create_app(fresh_service=p));assert c.post('/fresh-review-upload',files={'image':('x.png',b'invalid','image/png')},data={'zones':'[]'}).status_code==409
++ import io
++ from PIL import Image
++ buf=io.BytesIO();Image.new('RGB',(8,8)).save(buf,'PNG')
++ c=TestClient(create_app(fresh_service=p));assert c.post('/fresh-review-upload',files={'image':('x.png',buf.getvalue(),'image/png')},data={'zones':'[]'}).status_code==409
+  assert not p.path.exists()
+ 
+ def test_lossless_frontend_proposal_explicit_states_and_no_original_fallback(material):
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' vigilens-connect-2/backend/tests/test_frontend_audit_route.py /tmp/cand/vigilens-connect-3/backend/tests/test_frontend_audit_route.py
+--- vigilens-connect-2/backend/tests/test_frontend_audit_route.py	2026-10-31 22:29:29.000000000 +0530
++++ /tmp/cand/vigilens-connect-3/backend/tests/test_frontend_audit_route.py	2026-10-31 22:54:36.056351718 +0530
+@@ -43,7 +43,8 @@
+ def test_route_rejects_invalid_zones_before_any_lookup(material):
+  p,raw,frame,calls,c,job=material;n0=len(calls)
+  for bad in ('[{"id":"z"}]','NaN','[{"id":"a","name":"n","hazard":true,"points":[{"x":0,"y":0},{"x":1,"y":1}]}]'):
+-  assert c.post('/fresh-review-audit',files={'image':('x.png',raw,'image/png')},data={'zones':bad},headers=H).status_code==409
++  r=c.post('/fresh-review-audit',files={'image':('x.png',raw,'image/png')},data={'zones':bad},headers=H)
++  assert r.status_code==400 and r.json()['error']['code'].startswith('INVALID_')
+  assert len(calls)==n0
+ 
+ def test_partial_state_coverage_counts_and_full_digests_visible():
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' vigilens-connect-2/backend/tests/test_review_delta.py /tmp/cand/vigilens-connect-3/backend/tests/test_review_delta.py
+--- vigilens-connect-2/backend/tests/test_review_delta.py	1970-01-01 05:30:00.000000000 +0530
++++ /tmp/cand/vigilens-connect-3/backend/tests/test_review_delta.py	2026-10-31 22:52:31.199521924 +0530
+@@ -0,0 +1,98 @@
++"""Reviewer-delta coverage (connect-3): exact image-error status mapping on the governed
++route, fail-closed cross-process locking, CLI/seamless lock sharing with sidecar resync.
++Synthetic scope only; no network."""
++import hashlib, io, json
++import pytest
++from PIL import Image
++from fastapi.testclient import TestClient
++
++import dev_install as di
++from app import create_app
++from fresh_review.demo_approvals import SeamlessDemoApprovalStore
++
++
++def _png(color, size=(80, 80)):
++    im = Image.new('RGB', size, color); out = io.BytesIO(); im.save(out, 'PNG')
++    return out.getvalue()
++
++
++def _rotated_jpeg():
++    im = Image.new('RGB', (60, 40), (10, 20, 30))
++    exif = Image.Exif(); exif[274] = 6  # orientation: rotate 90
++    out = io.BytesIO(); im.save(out, 'JPEG', exif=exif)
++    return out.getvalue()
++
++
++def _client(tmp_path):
++    di.create_state(tmp_path / 'state', images=(), cors_origins=['http://localhost:5199'], seamless=True)
++    service, token, origins = di.load_service(str(tmp_path / 'state' / 'dev-config.json'))
++    return TestClient(create_app(fresh_service=service, fresh_token=token, cors_origins=origins)), token
++
++
++def _H(token):
++    return {'X-Vigilens-Local-Access': token, 'X-Vigilens-Display-Session': 'dev-session-' + 'x' * 30}
++
++
++def test_oversized_upload_keeps_413_not_generic_409(tmp_path):
++    client, token = _client(tmp_path)
++    big = b'\x89PNG\r\n\x1a\n' + b'0' * (15_000_100)
++    r = client.post('/fresh-review-audit-governed', files={'image': ('big.png', big, 'image/png')},
++                    data={'zones': '[]'}, headers=_H(token))
++    assert r.status_code == 413
++    assert r.json()['error']['code'] == 'IMAGE_TOO_LARGE'
++
++
++def test_exif_rotated_upload_keeps_422_and_records_no_approval(tmp_path):
++    client, token = _client(tmp_path)
++    r = client.post('/fresh-review-audit-governed', files={'image': ('r.jpg', _rotated_jpeg(), 'image/jpeg')},
++                    data={'zones': '[]'}, headers=_H(token))
++    assert r.status_code == 422
++    assert r.json()['error']['code'] == 'IMAGE_ORIENTATION_UNSUPPORTED'
++    # refused before approval recording: the seamless store stays empty
++    doc = json.loads((tmp_path / 'state' / 'approvals.json').read_bytes())
++    assert doc['approvals'] == {}
++
++
++def test_unsupported_media_keeps_415(tmp_path):
++    client, token = _client(tmp_path)
++    gif = b'GIF89a' + b'\x00' * 100
++    r = client.post('/fresh-review-audit-governed', files={'image': ('a.gif', gif, 'image/gif')},
++                    data={'zones': '[]'}, headers=_H(token))
++    assert r.status_code == 415
++    assert r.json()['error']['code'] == 'UNSUPPORTED_MEDIA_TYPE'
++
++
++def test_lock_failure_fails_closed_never_unlocked(tmp_path, monkeypatch):
++    path = tmp_path / 'approvals.json'
++    raw = b'{"version":1,"approvals":{}}\n'
++    path.write_bytes(raw); path.chmod(0o600)
++    store = SeamlessDemoApprovalStore(path, hashlib.sha256(raw).hexdigest())
++    import fcntl
++    monkeypatch.setattr(fcntl, 'flock', lambda *a, **k: (_ for _ in ()).throw(OSError('lock down')))
++    with pytest.raises(ValueError, match='lock'):
++        store.lookup('a' * 64, [80, 80])
++    # nothing recorded, file untouched
++    assert json.loads(path.read_bytes())['approvals'] == {}
++
++
++def test_cli_approve_serializes_and_running_seamless_server_resyncs(tmp_path):
++    di.create_state(tmp_path / 'state', images=(), cors_origins=['http://localhost:5199'], seamless=True)
++    approvals_path = tmp_path / 'state' / 'approvals.json'
++    raw = approvals_path.read_bytes()
++    # a "running server": seamless store holding the install-time pin
++    server = SeamlessDemoApprovalStore(approvals_path, hashlib.sha256(raw).hexdigest())
++    server.lookup('b' * 64, [80, 80])  # one seamless upload recording first
++    img = tmp_path / 'seed.png'; img.write_bytes(_png('grey'))
++    digest = di.approve_image(tmp_path / 'state', img)
++    # the same server object resyncs via the lock + sidecar: no restart, both entries present
++    frame = __import__('core').decode_image(img.read_bytes(), 'image/png')
++    spec = server.lookup(frame.digest, [frame.width, frame.height])
++    assert spec['rights_reference'] == 'developer-install-provided-test-image'
++    doc = json.loads(approvals_path.read_bytes())['approvals']
++    assert set(doc) == {'b' * 64, frame.digest}
++    assert digest == frame.digest
++    sidecar = approvals_path.with_name('approvals.recorded-sha256').read_text().strip()
++    assert sidecar == hashlib.sha256(approvals_path.read_bytes()).hexdigest()
++    # config pin advanced too (restart consistency either way)
++    config = json.loads((tmp_path / 'state' / 'dev-config.json').read_text())
++    assert config['approval_sha256'] == sidecar
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' vigilens-connect-2/frontend/.agent-native/dev-auth-secret /tmp/cand/vigilens-connect-3/frontend/.agent-native/dev-auth-secret
+--- vigilens-connect-2/frontend/.agent-native/dev-auth-secret	1970-01-01 05:30:00.000000000 +0530
++++ /tmp/cand/vigilens-connect-3/frontend/.agent-native/dev-auth-secret	2026-10-31 22:51:25.015084180 +0530
+@@ -0,0 +1 @@
++ff91e22c6c8131fcf7c424962bbfd5180c97ef734816a2d907c6f305b9198493
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' vigilens-connect-2/frontend/app/vigilens/api/__tests__/backendClient.test.ts /tmp/cand/vigilens-connect-3/frontend/app/vigilens/api/__tests__/backendClient.test.ts
+--- vigilens-connect-2/frontend/app/vigilens/api/__tests__/backendClient.test.ts	2026-10-31 22:36:13.000000000 +0530
++++ /tmp/cand/vigilens-connect-3/frontend/app/vigilens/api/__tests__/backendClient.test.ts	2026-10-31 22:52:36.707558505 +0530
+@@ -94,6 +94,26 @@
+     }
+   });
+ 
++  it("surfaces exact image-refusal codes for 413/415/422 without retry", async () => {
++    const mod = await importClient({ VITE_VIGILENS_LOCAL_ACCESS: TOKEN });
++    const file = new File([new Uint8Array([1])], "p.png", { type: "image/png" });
++    for (const [status, body, needle] of [
++      [413, { error: { code: "IMAGE_TOO_LARGE", message: "File exceeds 15,000,000 bytes." } }, "15,000,000 bytes"],
++      [415, { error: { code: "UNSUPPORTED_MEDIA_TYPE", message: "Use JPEG, PNG or WebP." } }, "JPEG, PNG or WebP"],
++      [422, { error: { code: "IMAGE_ORIENTATION_UNSUPPORTED", message: "Normalize EXIF orientation before uploading" } }, "EXIF orientation"],
++    ] as const) {
++      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(status, body)));
++      const err = await mod.analyzeWithBackend(file, []).catch((e) => e);
++      expect(err).toBeInstanceOf(mod.BackendError);
++      expect(err.message).toContain(needle);
++      expect(err.noRetry).toBe(true);
++    }
++    // malformed refusal body falls back to a bounded generic message
++    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(413, "not json")));
++    const err = await mod.analyzeWithBackend(file, []).catch((e) => e);
++    expect(err.message).toContain("refused this image (413)");
++  });
++
+   it("rejects non-JSON success responses", async () => {
+     const mod = await importClient({ VITE_VIGILENS_LOCAL_ACCESS: TOKEN });
+     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' vigilens-connect-2/frontend/app/vigilens/api/backendClient.ts /tmp/cand/vigilens-connect-3/frontend/app/vigilens/api/backendClient.ts
+--- vigilens-connect-2/frontend/app/vigilens/api/backendClient.ts	2026-10-31 21:59:15.000000000 +0530
++++ /tmp/cand/vigilens-connect-3/frontend/app/vigilens/api/backendClient.ts	2026-10-31 22:52:31.215522030 +0530
+@@ -84,6 +84,22 @@
+     if (response.status === 400) {
+       throw new BackendError("Invalid request (400): the backend rejected the upload fields.");
+     }
++    // Image-input failures carry operator-safe codes/messages from the backend
++    // ({error:{code,message}}); surface them instead of a generic error so a too-large,
++    // rotated or unsupported photo tells the user the real fix. No automatic retry.
++    if (response.status === 413 || response.status === 415 || response.status === 422) {
++      try {
++        const errJson = await response.json();
++        const code = errJson?.error?.code;
++        const message = errJson?.error?.message;
++        if (typeof code === "string" && typeof message === "string") {
++          throw new BackendError(`${message} (${response.status} ${code}). No automatic retry.`);
++        }
++      } catch (e) {
++        if (e instanceof BackendError) throw e;
++      }
++      throw new BackendError(`The backend refused this image (${response.status}). No automatic retry.`);
++    }
+     if (!response.ok) {
+       throw new BackendError(`Backend error: ${response.status}`);
+     }

@@ -1,0 +1,54 @@
+{
+ "approval_status": "not_verified_by_configuration",
+ "evidence_export_allowed": false,
+ "provider_calls_this_request": 0,
+ "rule_snapshot": {
+  "at": 1793254397.7488706,
+  "configuration": {
+   "approval_reference": "synthetic-no-owner-approval",
+   "camera_id": "generated-label-not-calibration",
+   "format": "vigilens.site-policy.proposal.v1",
+   "outside_rules": [],
+   "policy_id": "generated-only",
+   "priorities": [],
+   "scope": "illustrative_demo",
+   "version": "1",
+   "zones": [
+    {
+     "access_mode": "no_entry_all",
+     "id": "generated-zone",
+     "name": "Generated geometry only",
+     "points": [
+      {
+       "x": 0.01,
+       "y": 0.01
+      },
+      {
+       "x": 0.99,
+       "y": 0.01
+      },
+      {
+       "x": 0.99,
+       "y": 0.99
+      },
+      {
+       "x": 0.01,
+       "y": 0.99
+      }
+     ],
+     "rules": [
+      {
+       "check": "access",
+       "id": "generated-entry",
+       "priority": null
+      }
+     ]
+    }
+   ]
+  },
+  "event_id": 1,
+  "policy_sha256": "56584543d8ee1329704b5797b81b569c65da7a369aebef307179c57a9d459b14",
+  "status": "operator_configuration_not_verified_approval",
+  "zones_sha256": "8333903332c23a98eb2c91865069f09338edeec151580f199a1b3379c2fde93e"
+ }
+}

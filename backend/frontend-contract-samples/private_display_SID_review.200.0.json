@@ -1,0 +1,39 @@
+{
+ "coverage": "operator_claim_only",
+ "display_pixels_unchanged": false,
+ "evidence_export_allowed": false,
+ "expires_in_seconds": 899,
+ "face_covering_basis": "operator_visual_claim_not_detector_or_privacy_validation",
+ "face_coverings": [],
+ "fresh_assessment_binding": {
+  "result_sha256": "18a0824c86eebe4e9d23a962b1db9b1fb55464ae4f24043f2ae0ba84598248fa",
+  "source": "c04ceef86c178f47708c94cf1a0c829ebd88e5c0610202e6caa14a804d140e95"
+ },
+ "height": 334,
+ "notice": "Manual region treatment or explicit already-hidden face review only. Blur may retain identity. Not a face detector or anonymity guarantee. Original stays separate for inference. Export disabled.",
+ "output_sha256": "042d6f580e0dbce5eac5ee29fff177b4a59ee871699f45fa68a262398b8bd19b",
+ "preview_url": "<redacted-session>",
+ "privacy_review_status": "not_validated",
+ "provider_calls_this_request": 0,
+ "redaction_method": "opaque",
+ "regions": [
+  {
+   "box": [
+    212,
+    229,
+    218,
+    235
+   ],
+   "person_id": "0"
+  }
+ ],
+ "regions_digest": "286c07918793931fece9bca34fea7c097aec4dcea163b8f1b86811aa78ce59fe",
+ "reviewer_label": "synthetic operator",
+ "session_id": "<redacted-session>",
+ "source": "local_manual_private_display",
+ "source_digest": "c04ceef86c178f47708c94cf1a0c829ebd88e5c0610202e6caa14a804d140e95",
+ "viewing_assurance": "operator_claim_only_not_server_observed",
+ "visual_review_status": "operator_checked",
+ "warning": "Manual opaque regions only, not a face detector or anonymity guarantee. Body, tattoos, clothes and location can identify people. Not model input or safe evidence.",
+ "width": 320
+}

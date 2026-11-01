@@ -1,0 +1,31 @@
+--- /tmp/rv/integ/pkg/vigilens-app/backend/fresh_review/frontend_audit.py	2026-10-31 17:35:05.681701430 +0530
++++ backend/fresh_review/frontend_audit.py	2026-10-31 22:29:29.272219536 +0530
+@@ -35,6 +35,7 @@
+     return 'unknown'
+ 
+ def to_frontend_audit(result,*,audit_id,job_state='completed',source_digest=None,zones=None):
++    origin=_readings_origin(result)
+     img=result['image'];W,H=img['width'],img['height']
+     if not(_num(W)and _num(H)and W>0 and H>0):raise ValueError('Image size required')
+     if not isinstance(result.get('persons'),list)or not result['persons']:raise ValueError('Zero detected people: an empty person list could be misread as a clearance, so no view is produced')
+@@ -50,7 +51,9 @@
+             nonlocal n;n+=1;findings.append({'id':f'f{n}','rule_id':rule,'kind':'uncertainty','severity':None,'zone_id':zone,'message':msg,'review_state':'needs_human_review'})
+         for k in ITEMS:
+             if eff[k]=='unknown':add(f'{k}_reading',f'{k} not determined or not usable for this person (basis: {basis_of(p)}); needs human review')
+-            elif eff[k]=='absent':add(f'{k}_reading',f'Provider read {k} as absent (unvalidated reading); needs human review')
++            elif eff[k]=='absent':
++                if origin=='synthetic':add(f'{k}_reading',f'Synthetic transport generated a {k}-absent reading (offline test data, not a provider observation); needs human review')
++                else:add(f'{k}_reading',f'Provider read {k} as absent (unvalidated reading); needs human review')
+         if job_state!='completed'or ws_partial:add('result_partial','PARTIAL RESULT (state: %s): not every person or item was resolved; absence of a finding here is not a clearance; needs human review'%job_state)
+         for z in zones:add(f'zone_membership_{z["id"]}'[:120],f'Zone "{z["name"]}": whether this person is inside it was NOT determined (no ground-contact review was made); this is not a zone or safety check; needs human review',zone=z['id'])
+         add('provider_reading_unvalidated','Provider readings are unvalidated observations, not a safety or compliance check; needs human review')
+@@ -72,5 +75,8 @@
+         # Origin of the readings, derived from this exact stored result's recorded provider response ids: the
+         # synthetic transport labels every id 'synthetic-*'. All ids synthetic -> 'synthetic'; none synthetic ->
+         # 'live_provider'; missing or mixed -> 'unknown' (never guessed). Live readings stay unvalidated either way.
+-        'readings_origin':_readings_origin(result),
++        'readings_origin':origin,
++        # Geometry honesty: in synthetic mode the person boxes/masks are generated deterministically from the
++        # request bytes by the offline transport (hash-derived positions), not detected from scene content.
++        'person_geometry_origin':'synthetic_generated_not_detected' if origin=='synthetic' else 'provider_returned_unvalidated',
+         'compliance_status':'not_evaluated','privacy_review_status':'not_validated'}

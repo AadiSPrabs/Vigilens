@@ -1,0 +1,35 @@
+--- /tmp/rv/builder/frontend/app/vigilens/api/auditClient.ts	2026-10-31 21:38:47.321606161 +0530
++++ frontend/app/vigilens/api/auditClient.ts	2026-10-31 22:36:13.602737067 +0530
+@@ -1,5 +1,6 @@
+ import { FIXTURE_AUDITS, SAMPLE_PRESET_ZONES, type SampleId } from "../fixtures/audits";
+ import { validateAudit, AuditValidationError } from "../validate";
++import { analyzeWithBackend, backendConfigured } from "./backendClient";
+ import type { Audit, Zone } from "../types";
+ 
+ export const FIXTURE_UPLOAD_MESSAGE =
+@@ -37,8 +38,25 @@
+   return validateAudit(audit);
+ }
+ 
++export const BACKEND_NOT_CONFIGURED_MESSAGE =
++  "This frontend is not connected to a local backend yet. Set VITE_VIGILENS_LOCAL_ACCESS (and VITE_API_BASE_URL) in .env.local, or pick a bundled sample.";
++
++async function resolveBackend(params: AnalyzeParams): Promise<Audit> {
++  const { file, zones, signal } = params;
++  if (!file) throw new Error(FIXTURE_UPLOAD_MESSAGE);
++  if (!backendConfigured()) throw new Error(BACKEND_NOT_CONFIGURED_MESSAGE);
++  const audit = await analyzeWithBackend(file, zones, signal);
++  return validateAudit(audit);
++}
++
+ export function analyzeImage(params: AnalyzeParams): Promise<Audit> {
+   const { signal } = params;
++  // An uploaded image goes to the governed backend when this install is configured
++  // for it; bundled samples keep working offline from fixtures either way.
++  if (params.file) {
++    if (!backendConfigured()) return Promise.reject(new Error(BACKEND_NOT_CONFIGURED_MESSAGE));
++    return resolveBackend(params);
++  }
+   return new Promise<Audit>((resolve, reject) => {
+     if (signal?.aborted) {
+       reject(abortError());

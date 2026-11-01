@@ -1,0 +1,321 @@
+{
+ "provider_calls": 0,
+ "steps": [
+  {
+   "body_keys": [
+    "coverage",
+    "display_pixels_unchanged",
+    "evidence_export_allowed",
+    "expires_in_seconds",
+    "face_covering_basis",
+    "face_coverings",
+    "fresh_assessment_binding",
+    "height",
+    "notice",
+    "output_sha256",
+    "preview_url",
+    "privacy_review_status",
+    "provider_calls_this_request",
+    "redaction_method",
+    "regions",
+    "regions_digest",
+    "reviewer_label",
+    "session_id",
+    "source",
+    "source_digest",
+    "viewing_assurance",
+    "visual_review_status",
+    "warning",
+    "width"
+   ],
+   "error_or_detail": null,
+   "note": "owner-session bound; returns session_id, source_digest, output_sha256, regions_digest, frame_size",
+   "status": 200,
+   "step": "POST /fresh-review/{source}/private-display"
+  },
+  {
+   "body_keys": [
+    "_non_json",
+    "bytes",
+    "pdf",
+    "sha256",
+    "x-vigilens-export-allowed"
+   ],
+   "error_or_detail": null,
+   "note": "",
+   "status": 200,
+   "step": "GET /private-display/{sid}/image"
+  },
+  {
+   "body_keys": [
+    "detail"
+   ],
+   "error_or_detail": "Display session missing or expired",
+   "note": "",
+   "status": 404,
+   "step": "GET image, another session"
+  },
+  {
+   "body_keys": [
+    "detail"
+   ],
+   "error_or_detail": "Review must match this exact derivative and include every visual check",
+   "note": "",
+   "status": 409,
+   "step": "POST /private-display/{sid}/review, one check false"
+  },
+  {
+   "body_keys": [
+    "detail"
+   ],
+   "error_or_detail": "Exact whole-frame preview acknowledgment required",
+   "note": "",
+   "status": 409,
+   "step": "POST /fresh-private-report/{sid} before acknowledgement"
+  },
+  {
+   "body_keys": [
+    "coverage",
+    "display_pixels_unchanged",
+    "evidence_export_allowed",
+    "expires_in_seconds",
+    "face_covering_basis",
+    "face_coverings",
+    "fresh_assessment_binding",
+    "height",
+    "notice",
+    "output_sha256",
+    "preview_url",
+    "privacy_review_status",
+    "provider_calls_this_request",
+    "redaction_method",
+    "regions",
+    "regions_digest",
+    "reviewer_label",
+    "session_id",
+    "source",
+    "source_digest",
+    "viewing_assurance",
+    "visual_review_status",
+    "warning",
+    "width"
+   ],
+   "error_or_detail": null,
+   "note": "",
+   "status": 200,
+   "step": "POST /private-display/{sid}/review, all checks"
+  },
+  {
+   "body_keys": [
+    "automatic_contact",
+    "evidence_export_allowed",
+    "manual_contact",
+    "ownership_basis"
+   ],
+   "error_or_detail": null,
+   "note": "",
+   "status": 200,
+   "step": "POST /fresh-review/{source}/contact (point inside frame)"
+  },
+  {
+   "body_keys": [
+    "detail"
+   ],
+   "error_or_detail": "Fresh manual contact claim unavailable or invalid",
+   "note": "",
+   "status": 409,
+   "step": "POST contact, point outside frame"
+  },
+  {
+   "body_keys": [
+    "detail"
+   ],
+   "error_or_detail": "Fresh manual contact claim unavailable or invalid",
+   "note": "",
+   "status": 409,
+   "step": "POST contact, non-numeric point"
+  },
+  {
+   "body_keys": [
+    "assessment_id",
+    "assessment_source",
+    "automatic_contact",
+    "compliance_decision",
+    "configured_rule_review",
+    "contact_review_status",
+    "current_assessment_binding",
+    "deliberate_rechecks",
+    "derivative_sha256",
+    "evidence_export_allowed",
+    "face_covering_assurance",
+    "face_covering_review",
+    "manual_contact_review",
+    "notice",
+    "persons",
+    "ppe_basis_counts",
+    "ppe_cross_stage_review",
+    "ppe_segmentation",
+    "ppe_stage",
+    "ppe_summary_status",
+    "privacy_review_status",
+    "regions_digest",
+    "sam_configuration",
+    "sam_configuration_sha256",
+    "source",
+    "source_digest",
+    "spatial_explanations",
+    "status",
+    "whole_frame_operator_review",
+    "wide_scene",
+    "zone_review"
+   ],
+   "error_or_detail": null,
+   "note": "",
+   "status": 200,
+   "step": "POST /fresh-private-report/{sid}"
+  },
+  {
+   "body_keys": [
+    "detail"
+   ],
+   "error_or_detail": "Fresh private report source/person/preview binding changed",
+   "note": "",
+   "status": 409,
+   "step": "POST report, wrong source digest"
+  },
+  {
+   "body_keys": [
+    "detail"
+   ],
+   "error_or_detail": "Display session missing or expired",
+   "note": "",
+   "status": 404,
+   "step": "POST report, another session"
+  },
+  {
+   "body_keys": [
+    "_non_json",
+    "bytes",
+    "pdf",
+    "sha256",
+    "x-vigilens-export-allowed"
+   ],
+   "error_or_detail": null,
+   "note": "",
+   "status": 200,
+   "step": "POST /fresh-private-report/{sid}/pdf-preview"
+  },
+  {
+   "body_keys": [
+    "detail"
+   ],
+   "error_or_detail": "Private operator download scope not enabled; preview only",
+   "note": "export remains disabled unless a separate explicit mode is configured",
+   "status": 409,
+   "step": "POST /fresh-private-report/{sid}/private-download"
+  },
+  {
+   "body_keys": [
+    "automatic_contact",
+    "compliance_status",
+    "contract_version",
+    "evidence_export_allowed",
+    "persons",
+    "policy_status",
+    "privacy_review_status",
+    "provider_calls_this_request",
+    "result_sha256",
+    "source_digest",
+    "zone_snapshot"
+   ],
+   "error_or_detail": null,
+   "note": "",
+   "status": 200,
+   "step": "POST /fresh-review/{source}/zone-review (polygon)"
+  },
+  {
+   "body_keys": [
+    "automatic_contact",
+    "compliance_status",
+    "contract_version",
+    "evidence_export_allowed",
+    "persons",
+    "policy_status",
+    "privacy_review_status",
+    "provider_calls_this_request",
+    "result_sha256",
+    "source_digest",
+    "zone_snapshot"
+   ],
+   "error_or_detail": null,
+   "note": "",
+   "status": 200,
+   "step": "GET zone-review"
+  },
+  {
+   "body_keys": [
+    "detail"
+   ],
+   "error_or_detail": "Zone review unavailable or invalid; no safety policy applied",
+   "note": "",
+   "status": 409,
+   "step": "POST zone-review, out of bounds"
+  },
+  {
+   "body_keys": [
+    "detail"
+   ],
+   "error_or_detail": "Zone review unavailable or invalid; no safety policy applied",
+   "note": "",
+   "status": 409,
+   "step": "POST zone-review, two points"
+  },
+  {
+   "body_keys": [
+    "detail"
+   ],
+   "error_or_detail": "Zone review unavailable or invalid; no safety policy applied",
+   "note": "",
+   "status": 409,
+   "step": "POST zone-review, self-intersecting"
+  },
+  {
+   "body_keys": [
+    "detail"
+   ],
+   "error_or_detail": "Zone review unavailable or invalid; no safety policy applied",
+   "note": "",
+   "status": 409,
+   "step": "POST zone-review, stale result hash"
+  },
+  {
+   "body_keys": [
+    "detail"
+   ],
+   "error_or_detail": "Zone review unavailable or changed",
+   "note": "",
+   "status": 409,
+   "step": "GET zone-review, another session"
+  },
+  {
+   "body_keys": [
+    "cleared",
+    "evidence_export_allowed"
+   ],
+   "error_or_detail": null,
+   "note": "",
+   "status": 200,
+   "step": "DELETE /private-display/{sid}"
+  },
+  {
+   "body_keys": [
+    "detail"
+   ],
+   "error_or_detail": "Display session missing or expired",
+   "note": "",
+   "status": 404,
+   "step": "GET image after delete"
+  }
+ ],
+ "synthetic": true
+}

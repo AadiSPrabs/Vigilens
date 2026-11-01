@@ -1,0 +1,167 @@
+{
+ "all_detected_people_assessed": true,
+ "all_detected_people_assessed_meaning": "provider_observation_attempted_for_every_detected_person_not_resolved_assessment",
+ "all_detected_people_target_level_resolved": false,
+ "assessment_id": "fresh:c04ceef86c178f47708c94cf1a0c829ebd88e5c0610202e6caa14a804d140e95:18a0824c86eebe4e9d23a962b1db9b1fb55464ae4f24043f2ae0ba84598248fa",
+ "assessment_status": "provider_observations_require_manual_review",
+ "compliance": {
+  "status": "not_evaluated"
+ },
+ "contract_status": "local_proposal_not_agreed_with_frontend",
+ "contract_version": "vigilens.private-review.proposal.v1",
+ "coverage": "not_wide_scene",
+ "evidence_export_allowed": false,
+ "evidence_image": null,
+ "evidence_status": "not_released",
+ "execution_state_is_not_assessment_completeness": true,
+ "image": {
+  "height": 334,
+  "pixel_digest": "c04ceef86c178f47708c94cf1a0c829ebd88e5c0610202e6caa14a804d140e95",
+  "width": 320
+ },
+ "input_provenance": {
+  "kind": "fresh_provider_result"
+ },
+ "persons": [
+  {
+   "compliance": {
+    "status": "not_evaluated"
+   },
+   "findings": null,
+   "findings_status": "not_evaluated",
+   "geometry_status": "mask_verified",
+   "id": "0",
+   "mask": {
+    "box_half_open_pixels": [
+     211,
+     228,
+     271,
+     255
+    ],
+    "coordinate_basis": "original_upright_source_pixels",
+    "counts": [
+     5,
+     49,
+     9,
+     53,
+     6,
+     55,
+     4,
+     57,
+     3,
+     58,
+     1,
+     59,
+     1,
+     59,
+     1,
+     59,
+     1,
+     179,
+     1,
+     59,
+     1,
+     59,
+     1,
+     59,
+     1,
+     59,
+     1,
+     59,
+     1,
+     59,
+     1,
+     59,
+     1,
+     59,
+     1,
+     59,
+     1,
+     59,
+     2,
+     58,
+     2,
+     57,
+     4,
+     56,
+     5,
+     54,
+     7,
+     51,
+     12,
+     45,
+     8
+    ],
+    "encoding": "binary_rle_row_major_v1",
+    "foreground_value": 1,
+    "lossless": true,
+    "origin_pixels": [
+     211,
+     228
+    ],
+    "pixel_sha256": "47ef09855c03b19ee7267574e09b09d5860f9f8fe9aca85609b989740059fa09",
+    "size": [
+     60,
+     27
+    ],
+    "source_frame_size": [
+     320,
+     334
+    ],
+    "starts_with": 0
+   },
+   "ppe": {
+    "assessment_status": "provider_observation_unvalidated",
+    "crop_basis": "crop_rule_ineligible",
+    "crop_rule_reasons": [
+     "crop_too_small_for_configured_evidence_threshold"
+    ],
+    "helmet": {
+     "provider_observation": "unknown",
+     "reason": "provider_observation_not_safety_clearance",
+     "resolved_state": "unknown",
+     "status": "unknown",
+     "target_attribution": "unresolved_partial_evidence",
+     "target_level_outcome_permitted": false,
+     "visible_evidence": "generated pixels"
+    },
+    "vest": {
+     "provider_observation": "unknown",
+     "reason": "provider_observation_not_safety_clearance",
+     "resolved_state": "unknown",
+     "status": "unknown",
+     "target_attribution": "unresolved_partial_evidence",
+     "target_level_outcome_permitted": false,
+     "visible_evidence": "generated pixels"
+    }
+   },
+   "review_status": "needs_human_review",
+   "zone_membership": {
+    "assessment_status": "not_checked",
+    "zone_ids": null
+   }
+  }
+ ],
+ "ppe_basis_counts": {
+  "attempted_clean_rule_both_items_unknown_count": 0,
+  "attempted_is_not_resolved_assessment": true,
+  "attribution_unresolved_partial_count": 1,
+  "counts_are_not_the_10_plus_qualification": true,
+  "detected_count": 1,
+  "emitted_is_not_resolved": true,
+  "fully_resolved_person_count": 0,
+  "legacy_basis_not_recorded_count": 0,
+  "legacy_field_semantics": "PPE_assessed_count, all_detected_people_assessed and ppe_assessed (older names, kept unchanged for compatibility) mean provider observation attempted, not a resolved assessment",
+  "legacy_outcome_withheld_count": 0,
+  "outcome_emitted_clean_rule_count": 0,
+  "outcome_emitted_count": 0,
+  "provider_observation_attempted_count": 1,
+  "resolved_item_count": 0,
+  "resolved_means": "both helmet and vest known (present or absent) on a clean_crop proven by the stored eligibility record; still an unvalidated provider reading, not safe or compliant",
+  "target_level_outcome_permitted_count": 0
+ },
+ "ppe_withheld_unverified_geometry": false,
+ "privacy_review_status": "not_validated",
+ "provider_calls_this_request": 0,
+ "zones": []
+}

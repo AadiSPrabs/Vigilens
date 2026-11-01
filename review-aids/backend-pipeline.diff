@@ -1,0 +1,25 @@
+--- /tmp/rv/integ/pkg/vigilens-app/backend/fresh_review/pipeline.py	2026-10-31 17:42:42.613748627 +0530
++++ backend/fresh_review/pipeline.py	2026-10-31 22:29:29.276219573 +0530
+@@ -60,8 +60,8 @@
+ 
+ 
+ class FreshPipeline:
+-    def __init__(self,database,*,approval_store=None,transport=None,execution_scope='private_provider_processing',carry_path=CARRY_PATH,carry_sha=None):
+-        self.path=Path(database);self.approval_store=approval_store or ApprovalStore();self.transport=transport or disabled_transport
++    def __init__(self,database,*,approval_store=None,transport=None,execution_scope='private_provider_processing',carry_path=CARRY_PATH,carry_sha=None,cap_enforcement=True):
++        self.path=Path(database);self.approval_store=approval_store or ApprovalStore();self.transport=transport or disabled_transport;self.cap_enforcement=cap_enforcement
+         self.carry_path=Path(carry_path)if carry_path is not None else None;self.carry_sha=carry_sha
+         self.execution_scope=execution_scope
+         if execution_scope not in ('private_provider_processing','synthetic_local_qualification'):raise ValueError('Explicit execution scope required')
+@@ -209,7 +209,10 @@
+             verify_explanations(self,c)
+             from .stopped_source import original_total
+             booked=D(carry['conservative_booked_usd'])+original_total(self,c)+reservation_total(c)+mask_total(c)+explanation_total(c)
+-            if booked+RESERVE>aggregate_cap(carry):raise ValueError('Same aggregate cap unavailable; held reservations count in full')
++            if self.cap_enforcement and booked+RESERVE>aggregate_cap(carry):raise ValueError('Same aggregate cap unavailable; held reservations count in full')
++            # cap_enforcement=False (explicit install config, owner demo direction): booking above continues
++            # unchanged - every reservation and cost is still recorded in full; only the refusal is skipped. The
++            # spending stop is then the provider-side key limit, not this app-level gate.
+             c.execute('INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?)',(source,'running_uncertain',str(RESERVE),'0',json.dumps(binding),None,None,time.time()));c.commit();return True
+         finally:c.close()
+     def attempted_count(self,source):

@@ -1,0 +1,20 @@
+{
+ "automatic_contact": false,
+ "evidence_export_allowed": false,
+ "manual_contact": {
+  "at": 1793254397.665479,
+  "claim": {
+   "basis": "original_source_and_person_mask_operator_claim",
+   "compliance_status": "not_evaluated",
+   "face_coverage_approved": false,
+   "point": [
+    0.6815625,
+    0.7607784431137724
+   ],
+   "reviewer_label": "synthetic claim not actual boots",
+   "zone_status": "not_checked"
+  },
+  "event_id": 1
+ },
+ "ownership_basis": "private_access_token_and_browser_nonce_not_verified_human"
+}

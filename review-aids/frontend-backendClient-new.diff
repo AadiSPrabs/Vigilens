@@ -1,0 +1,119 @@
+--- /dev/null	2026-10-31 07:39:24.500350656 +0530
++++ frontend/app/vigilens/api/backendClient.ts	2026-10-31 21:59:15.000000000 +0530
+@@ -0,0 +1,116 @@
++// Backend adapter: the UI never calls a provider API itself. Uploads go to the local
++// Vigilens backend's governed fresh-review route with the per-install local access key
++// (VITE_VIGILENS_LOCAL_ACCESS) and a per-page-session display value. Neither is an
++// account or identity. Refused/held responses surface as-is and are never retried
++// automatically by this client.
++import type { Audit, Zone } from "../types";
++
++const BACKEND_ENDPOINT = "/fresh-review-audit-governed";
++const DEFAULT_BASE = "http://localhost:8001";
++const LOCAL_ACCESS = import.meta.env.VITE_VIGILENS_LOCAL_ACCESS || "";
++// One display-session value per page session; format-checked bearer value only.
++const DISPLAY_SESSION = "fe-" + crypto.randomUUID();
++const TIMEOUT_MS = 60000;
++
++export class BackendError extends Error {
++  noRetry = true;
++}
++
++export function backendConfigured(): boolean {
++  return LOCAL_ACCESS.length > 0;
++}
++
++function stripZone(zone: Zone) {
++  return {
++    id: zone.id,
++    name: zone.name,
++    hazard: zone.hazard,
++    points: zone.points.map((p) => ({ x: p.x, y: p.y })),
++  };
++}
++
++export async function analyzeWithBackend(
++  file: File,
++  zones: Zone[],
++  signal?: AbortSignal,
++): Promise<Audit> {
++  const baseUrl = import.meta.env.VITE_API_BASE_URL || DEFAULT_BASE;
++  const formData = new FormData();
++  formData.append("image", file);
++  formData.append("zones", JSON.stringify(zones.map(stripZone)));
++
++  const controller = new AbortController();
++  const timeoutId = setTimeout(() => controller.abort("timeout"), TIMEOUT_MS);
++  if (signal) {
++    signal.addEventListener("abort", () => controller.abort(signal.reason));
++  }
++
++  try {
++    // Never set Content-Type manually on FormData.
++    const response = await fetch(baseUrl + BACKEND_ENDPOINT, {
++      method: "POST",
++      body: formData,
++      headers: {
++        "X-Vigilens-Local-Access": LOCAL_ACCESS,
++        "X-Vigilens-Display-Session": DISPLAY_SESSION,
++      },
++      signal: controller.signal,
++    });
++
++    if (response.status === 403) {
++      throw new BackendError(
++        "Local access key missing or wrong (403). Check VITE_VIGILENS_LOCAL_ACCESS against this install's access-token.txt.",
++      );
++    }
++    if (response.status === 503) {
++      throw new BackendError("Provider execution disabled on this backend (503); no claim or call was created.");
++    }
++    if (response.status === 409) {
++      try {
++        const errJson = await response.json();
++        const code = errJson?.detail?.code;
++        if (code === "ATTEMPT_UNCERTAIN") {
++          throw new BackendError(
++            "A provider attempt for this exact image was started and did not finish. It is held and never retried automatically; only the backend ledger reconciles it.",
++          );
++        }
++      } catch (e) {
++        if (e instanceof BackendError) throw e;
++      }
++      throw new BackendError(
++        "This image is not approved for analysis on this install, or the result is not presentable (409). No automatic retry.",
++      );
++    }
++    if (response.status === 400) {
++      throw new BackendError("Invalid request (400): the backend rejected the upload fields.");
++    }
++    if (!response.ok) {
++      throw new BackendError(`Backend error: ${response.status}`);
++    }
++
++    const contentType = response.headers.get("content-type");
++    if (!contentType || !contentType.includes("application/json")) {
++      throw new BackendError("Invalid response format");
++    }
++    const audit = (await response.json()) as Audit;
++    // Normalize to the UI's Audit shape: fields the UI renders but the governed
++    // route does not emit. Extra governed-route fields (readings_origin, job_state,
++    // zones_applied, ...) are preserved for honesty labeling.
++    audit.fixture_loaded_at = audit.fixture_loaded_at ?? null;
++    audit.fixture_notice = audit.fixture_notice ?? null;
++    for (const person of audit.persons) {
++      for (const finding of person.findings) {
++        finding.recheck_trace = finding.recheck_trace ?? [];
++      }
++    }
++    return audit;
++  } catch (err) {
++    if (err instanceof BackendError) throw err;
++    if ((err as DOMException)?.name === "AbortError" || err === "timeout") {
++      throw new Error("No response yet; the audit may still be running.");
++    }
++    throw err;
++  } finally {
++    clearTimeout(timeoutId);
++  }
++}
