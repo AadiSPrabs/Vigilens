@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Audit, PrivateDisplaySession } from "../types";
 import { RecheckLoopPanel } from "./RecheckLoopPanel";
-import { personLabel } from "../format";
+import { personMappings } from "../format";
 import {
   executeExplanation, reserveExplanation,
   fetchIntegrationContract,
@@ -53,11 +53,12 @@ export function PrivateReportPanel({ audit, session }: { audit: Audit; session: 
     setDone(false);
   };
 
-  // Same labels the stage outlines and findings list use (Person N, 1-based by position), with the backend id
-  // beside it, so a reviewer can tie each attestation to the outlined figure instead of guessing.
+  // Same labels the stage outlines carry (Person N, tied to the person record's own id and polygon). A person
+  // with no usable outline or a duplicated id is unmapped: no label is implied and its attestations stay off.
+  const mappings = personMappings(audit.persons);
   const labelFor = (id: string) => {
-    const index = audit.persons.findIndex((p) => p.id === id);
-    return index >= 0 ? `${personLabel(audit.persons[index]!, index)} (backend id ${id}, the outlined figure with this label)` : `Person (backend id ${id})`;
+    const m = mappings.get(id);
+    return m && m.mapped ? `${m.label} (backend id ${id}, labelled "${m.label}" on the photo)` : `Unmapped person (backend id ${id}): no usable outline on the photo, attestations disabled`;
   };
 
   const [report, setReport] = useState<PrivateReportDocument | null>(null);
@@ -255,7 +256,7 @@ export function PrivateReportPanel({ audit, session }: { audit: Audit; session: 
                   type="checkbox"
                   checked={reviews[person.id]?.[key] ?? false}
                   onChange={() => toggle(person.id, key)}
-                  disabled={busy}
+                  disabled={busy || !mappings.get(person.id)?.mapped}
                 />
                 <span>{label}</span>
               </label>

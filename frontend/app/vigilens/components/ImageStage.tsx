@@ -3,7 +3,7 @@ import { useId, useRef, useState, type KeyboardEvent, type MouseEvent, type Reac
 
 import { clientToNormalized } from "../geometry";
 import { personOutline } from "../severity";
-import { personLabel, zoneNameFor } from "../format";
+import { personLabel, personMappings, zoneNameFor } from "../format";
 import type { Person, Point, Zone } from "../types";
 
 type Props = {
@@ -195,6 +195,25 @@ export function ImageStage({
               </span>
             );
           })}
+
+          {persons ? (() => {
+            const maps = personMappings(persons);
+            return persons.map((person) => {
+              const m = maps.get(person.id);
+              if (!m) return null;
+              const { left, top } = m.mapped ? bounds(person.polygon) : { left: 0, top: 0 };
+              return (
+                <span
+                  key={`person-label-${person.id}`}
+                  data-person-label={person.id}
+                  className="pointer-events-none absolute rounded-vg-sm bg-vg-surface px-1.5 py-0.5 text-xs font-semibold text-vg-text shadow-vg-1"
+                  style={{ left: `${left * 100}%`, top: `${top * 100}%`, lineHeight: "16px", marginTop: m.mapped ? -20 : 4, marginLeft: m.mapped ? 0 : 4 }}
+                >
+                  {m.mapped ? m.label : `Unmapped (id ${person.id})`}
+                </span>
+              );
+            });
+          })() : null}
 
           {draftPoints?.map((p, i) => (
             <span

@@ -1,3 +1,4 @@
+import { personMappings } from "../format";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { Audit, FaceProposalsResult, PrivateDisplaySession } from "../types";
@@ -487,11 +488,12 @@ export function PreviewCeremony(props: {
                       <input
                         type="checkbox"
                         className="mt-0.5 size-4 shrink-0"
+                        disabled={!personMappings(audit.persons).get(person.id)?.mapped}
                         checked={shielded[person.id] ?? false}
                         onChange={(e) => { setError(null); setShielded((prev) => ({ ...prev, [person.id]: e.target.checked })); }}
                       />
                       <span>
-                        Person {person.id} wears an opaque face shield that fully hides their face - I verified no
+                        {personMappings(audit.persons).get(person.id)?.mapped ? `${personMappings(audit.persons).get(person.id)!.label} (backend id ${person.id}, labelled on the photo)` : `Unmapped person (backend id ${person.id}), not attestable`} wears an opaque face shield that fully hides their face - I verified no
                         face pixels are visible on this exact photo. (Exact shield review, not a detector result.)
                       </span>
                     </label>
