@@ -508,7 +508,7 @@ export type PrivateReportDocument = {
   status?: string;
   evidence_export_allowed?: boolean;
   spatial_explanations?: { status?: string; attempts?: unknown[]; exact_plan_sha256?: string; reservation?: string };
-  configured_rule_review?: { status?: string };
+  configured_rule_review?: { status?: string; persons?: { person_id: string; summary?: string; findings?: { rule_id: string; zone_id: string | null; status: string; priority: number | null; reason: string }[] }[] };
   bounded_review_loop?: { status?: string; attempt_count?: number; unknown_person_ids?: string[]; blocked_until?: string; note?: string; creates_grant_or_reservation?: boolean };
   notice?: string;
   [key: string]: unknown;
@@ -580,6 +580,36 @@ export async function postZoneReview(
     });
     if (!response.ok) return readRefusal(response, "Zone review unavailable or invalid; no safety policy applied");
     return (await response.json()) as ZoneReviewResult;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+export type ContactClaimResult = { manual_contact?: { at?: number; event_id?: number }; automatic_contact?: boolean; [key: string]: unknown };
+
+// One manual ground-contact claim for one mapped person, bound to the exact acknowledged source. The backend
+// refuses a point outside that person's detected foreground; the refusal is shown as-is and never retried.
+export async function postContactClaim(
+  sourceDigest: string,
+  claim: { personId: string; point: { x: number; y: number }; exactSourceConfirmed: boolean; bootsGroundVisible: boolean; reviewerLabel: string },
+): Promise<ContactClaimResult> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort("timeout"), TIMEOUT_MS);
+  try {
+    const response = await fetch(`/api/vigilens/fresh-review/${encodeURIComponent(sourceDigest)}/contact`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        person_id: claim.personId,
+        point: [claim.point.x, claim.point.y],
+        exact_source_confirmed: claim.exactSourceConfirmed,
+        boots_ground_visible: claim.bootsGroundVisible,
+        reviewer_label: claim.reviewerLabel,
+      }),
+      signal: controller.signal,
+    });
+    if (!response.ok) return readRefusal(response, "Manual contact claim unavailable or invalid; nothing recorded");
+    return (await response.json()) as ContactClaimResult;
   } finally {
     clearTimeout(timeoutId);
   }

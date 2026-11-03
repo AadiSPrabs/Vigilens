@@ -455,6 +455,8 @@ def create_router(service,display):
                 out=build_private_report(assessment,s.meta,payload,full_frame_review=s.review_ack)
                 if job['state']=='archived_verified':out['archive_provenance']=job['archive_provenance']
                 out['contact_review_status']='operator_claims_only'if len(contacts)==len(result['persons'])else'needs_manual_contact_review'
+                from .overlays import person_display_labels
+                out['person_display']=person_display_labels(result)
                 out['zone_review']=zone_view(binding['source'],job,x_vigilens_display_session)
                 rules=RuleStore(SERVICE).latest(binding['source'],binding['result_sha256'],x_vigilens_display_session)
                 out['configured_rule_review']=evaluate_report_rules(rules,out['zone_review'],out['persons'])

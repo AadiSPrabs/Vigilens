@@ -61,3 +61,24 @@ def test_rule_geometry_and_tampering(material):
  db=sqlite3.connect(p.path);db.execute("UPDATE rule_events SET policy_sha='changed'");db.commit();db.close()
  assert report(c,x,job).status_code==409
  assert len(calls)==2
+
+def test_pdf_and_report_label_people_like_the_stage_and_show_contact_outcomes(material,monkeypatch,tmp_path):
+ # Mechanism test on the synthetic fixture: stage label (position+1) and backend id travel together in report JSON, PDF and overlay.
+ import os
+ from fresh_review.overlays import person_display_labels
+ monkeypatch.setattr('fresh_review.ppe_basis.basis_of',lambda person:'clean_crop')
+ p,raw,frame,calls,c,job=material;x=prepare(c,raw,frame);acknowledge(c,x);submit(c,frame,job);rules(c,frame,job)
+ identity='fresh:'+frame.digest+':'+digest(job['result'])
+ pid=job['result']['persons'][0]['id']
+ body={'assessment_id':identity,'source_digest':frame.digest,'output_sha256':x['output_sha256'],'regions_digest':x['regions_digest'],'persons':report(c,x,job).request.content and __import__('json').loads(report(c,x,job).request.content)['persons']}
+ before=c.post('/fresh-private-report/'+x['session_id'],json=body).json()
+ assert before['person_display']==person_display_labels(job['result'])
+ assert before['person_display'][pid]['text']=='Person 1 (backend id %s)'%pid
+ assert all(f['status']=='needs_review'for f in before['configured_rule_review']['persons'][0]['findings'])
+ contact(c,frame)
+ after=c.post('/fresh-private-report/'+x['session_id'],json=body).json()
+ assert all(f['status']=='observed_violation'for f in after['configured_rule_review']['persons'][0]['findings'])
+ pdf=c.post('/fresh-private-report/'+x['session_id']+'/pdf-preview',json=body)
+ assert pdf.status_code==200 and pdf.content.startswith(b'%PDF-')
+ out=os.environ.get('VIGILENS_TEST_PDF_OUT')
+ if out:open(out,'wb').write(pdf.content)

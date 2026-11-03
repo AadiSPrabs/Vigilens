@@ -4,6 +4,7 @@ import { ImageStage } from "@/vigilens/components/ImageStage";
 import { RechecksPanel } from "@/vigilens/components/RechecksPanel";
 import { PreviewCeremony } from "@/vigilens/components/PreviewCeremony";
 import { PrivateReportPanel } from "@/vigilens/components/PrivateReportPanel";
+import { ContactClaimPanel } from "@/vigilens/components/ContactClaimPanel";
 import { ZoneReviewPanel } from "@/vigilens/components/ZoneReviewPanel";
 import { ClipPanel } from "@/vigilens/components/ClipPanel";
 import { executeRecheck } from "@/vigilens/api/backendClient";
@@ -280,6 +281,9 @@ export default function VigilensRoute() {
             ) : null}
             {previewReady && previewSession && audit ? (
               <PrivateReportPanel audit={audit} session={previewSession} />
+            ) : null}
+            {previewReady && previewSession && audit && audit.source === "backend" ? (
+              <ContactClaimPanel audit={audit} session={previewSession} />
             ) : null}
             {audit && audit.source === "backend" ? (
               <ZoneReviewPanel audit={audit} zones={zones} previewReady={previewReady} />

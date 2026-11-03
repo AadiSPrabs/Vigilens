@@ -78,10 +78,14 @@ def render_private_pdf(report,overlay_png,*,_pages_only=False):
     rule_review=report.get('configured_rule_review',{})
     line('Rule review: '+rule_review.get('status','not_configured').replace('_',' '))
     line('Location uses current operator contact claims, not automatic ground contact.',small)
+    _pd=report.get('person_display')or{}
+    def plabel(pid):
+        e=_pd.get(str(pid))
+        return e['text'] if e else 'Unmapped person (backend id '+str(pid)+')'
     for person in report['persons']:
         if y+250>height-110:new_page()  # keep each person block on one page
         y+=16
-        line('Person '+person['person_id'])
+        line(plabel(person['person_id']))
         line('Protective hardhat worn: '+person['report_display_helmet']+' | Reflective vest worn: '+person['report_display_vest'])
         line('Hardhat observation is separate from a welding face shield and site-specific requirements.',small)
         line('Evidence: '+person['status'].replace('_',' '),small)
@@ -119,7 +123,7 @@ def render_private_pdf(report,overlay_png,*,_pages_only=False):
         if review.get('flagged_finding_keys'):line('REVIEW FLAG: segmentation references unsupported because auxiliary PPE masks were not supplied.',small)
         for row in attempt['result']['explanations']:
             if y+160>height-110:new_page()
-            line('Person '+row['person_id']+' | Rule '+row['rule_id']+' | '+row['status'].replace('_',' '),small)
+            line(plabel(row['person_id'])+' | Rule '+row['rule_id']+' | '+row['status'].replace('_',' '),small)
             line(row['model_commentary'],small)
         line('Deterministic status and priority remain authoritative; commentary cannot change them.',small)
     rechecks=report.get('deliberate_rechecks',{})
@@ -130,7 +134,7 @@ def render_private_pdf(report,overlay_png,*,_pages_only=False):
         for attempt in rechecks.get('attempts',[]):
             if y+180>height-110:new_page()
             person=(attempt.get('binding')or{}).get('person_id','?')
-            line('Person '+str(person)+' | '+str(attempt.get('state','unknown')).replace('_',' ')+' | candidate adoption requires separate human review')
+            line(plabel(person)+' | '+str(attempt.get('state','unknown')).replace('_',' ')+' | candidate adoption requires separate human review')
             result=attempt.get('result')
             obs=result.get('candidate_observations') if isinstance(result,dict) else None
             if isinstance(obs,dict) and obs:

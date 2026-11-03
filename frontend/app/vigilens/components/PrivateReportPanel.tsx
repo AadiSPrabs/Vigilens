@@ -360,6 +360,27 @@ export function PrivateReportPanel({ audit, session }: { audit: Audit; session: 
             Configured rule review: {report.configured_rule_review?.status ?? "not evaluated"}.
           </p>
           {(() => {
+            const rows = report.configured_rule_review?.persons;
+            if (!Array.isArray(rows) || rows.length === 0) return null;
+            return (
+              <div className="mt-1" data-testid="rule-outcomes">
+                <p className="font-medium">Rule outcomes (private, not a safety clearance)</p>
+                {rows.map((row) => (
+                  <div key={row.person_id} className="mt-1">
+                    <p>{labelFor(row.person_id)}</p>
+                    {(row.findings ?? []).map((f) => (
+                      <p key={`${f.rule_id}-${String(f.zone_id)}`} className="text-muted-foreground">
+                        Rule {f.rule_id} | Zone {String(f.zone_id)} | {f.status.replace(/_/g, " ")} | priority{" "}
+                        {f.priority === null ? "not configured / needs review" : String(f.priority)} | {f.reason.replace(/_/g, " ")}
+                      </p>
+                    ))}
+                    {(row.findings ?? []).length === 0 && row.summary ? <p className="text-muted-foreground">{row.summary}</p> : null}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+          {(() => {
             // Real v6.2 recheck_view contract: attempt_id/state/result +
             // binding.person_id; candidate observations live in `result`.
             const dr = (report as { deliberate_rechecks?: { status?: string; attempts?: { attempt_id?: string; state?: string; result?: unknown; binding?: { person_id?: string }; candidate_adoption?: string }[]; original_result_unchanged?: boolean } }).deliberate_rechecks;

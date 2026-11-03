@@ -4,6 +4,22 @@ from PIL import Image,ImageDraw,ImageFilter,ImageChops
 from .masks import decode_mask
 from .zones import canonical_zones
 
+
+def person_display_labels(result):
+    """Stable display labels shared with the stage: position in the stored persons list plus 1, only when the
+    id is unique and the stored box is a usable integer box inside the frame. Otherwise the person is unmapped
+    (no number, no tag). The id always travels with the label."""
+    frame=result.get('image')or{};W,H=frame.get('width'),frame.get('height');people=result.get('persons')or[]
+    counts={}
+    for p in people:counts[p.get('id')]=counts.get(p.get('id'),0)+1
+    out={}
+    for i,p in enumerate(people):
+        box=p.get('box_half_open');ok=(isinstance(box,(list,tuple))and len(box)==4 and all(type(v)is int for v in box)and type(W)is int and type(H)is int
+            and 0<=box[0]<box[2]<=W and 0<=box[1]<box[3]<=H)
+        pid=str(p.get('id'));mapped=bool(ok and counts[p.get('id')]==1)
+        out[pid]={'mapped':mapped,'label':('Person %d'%(i+1))if mapped else'Unmapped person','text':(('Person %d (backend id %s)'%(i+1,pid))if mapped else('Unmapped person (backend id %s)'%pid))}
+    return out
+
 def render_overlay(treated_png,result,zones,redaction_regions=(),ppe_segmentations=()):
     with Image.open(io.BytesIO(treated_png))as image:
         image.load();out=image.convert('RGB').copy()
@@ -47,6 +63,17 @@ def render_overlay(treated_png,result,zones,redaction_regions=(),ppe_segmentatio
         for person in result['persons']:
             l,t,r,b=person['box_half_open'];label='P'+str(person['id']);w=int(draw.textlength(label,font=font))+6;th=fs+4;y0=t-th-1 if t>=th+1 else t+1
             x0=min(max(0,l),max(0,out.width-w));draw.rectangle((x0,y0,x0+w,y0+th),fill=colors.get(person.get('ppe_evidence_status'),(0,0,0)));draw.text((x0+3,y0+2),label,fill=(255,255,255),font=font)
+    else:
+        # Non-sequential jobs: tag each mapped person with the same "Person N" label the stage shows.
+        from PIL import ImageFont
+        labels=person_display_labels(result);fs=max(13,round(out.width/70));font=ImageFont.load_default(size=fs)
+        for person in result['persons']:
+            info=labels.get(str(person['id']))
+            if not info or not info['mapped']:continue
+            l,t,r,b=person['box_half_open'];label=info['label'];w=int(draw.textlength(label,font=font))+6;th=fs+4
+            # Above the head when there is room, else below the feet, else (no room anywhere) inside the box top.
+            y0=t-th-1 if t>=th+1 else (b+1 if b+th+1<=out.height else t+1)
+            x0=min(max(0,l),max(0,out.width-w));draw.rectangle((x0,y0,x0+w,y0+th),fill=(20,20,20));draw.text((x0+3,y0+2),label,fill=(255,255,255),font=font)
     # Restore every treated privacy region after drawing, so overlay lines cannot
     # alter or obscure the reviewed treatment. No source pixels are used.
     with Image.open(io.BytesIO(treated_png))as treated:
