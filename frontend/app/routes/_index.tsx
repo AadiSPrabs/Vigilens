@@ -206,7 +206,7 @@ export default function VigilensRoute() {
               imageUrl={stageUrl}
               onImageError={storedStageUrl ? () => setPreviewSession(null) : undefined}
               imageAlt={source?.kind === "stored" ? "Treated preview (masked regions black), not the original photo" : source?.kind === "sample" ? `${SAMPLES.find((s) => s.id === source.sampleId)?.label} site scene` : `Uploaded photo ${source?.kind === "upload" ? source.name : ""}`}
-              zones={displayZones}
+              zones={source?.kind === "stored" ? zones : displayZones}
               persons={audit ? audit.persons : null}
               selectedPersonId={selectedPersonId}
               onSelectPerson={(id) => dispatch({ type: "select", personId: id })}
