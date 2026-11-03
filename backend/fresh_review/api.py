@@ -181,6 +181,33 @@ def create_router(service,display):
 
     @router.post('/fresh-review/{source}/private-display')
     async def prepare_display(source:str,image:UploadFile=File(...),review:str=Form(...),x_vigilens_display_session:str=Header('')):
+        return await _prepare_display(source,image,review,x_vigilens_display_session)
+
+    class _StoredSource:
+        # Minimal UploadFile stand-in over the caller's OWN preserved canonical PNG.
+        content_type='image/png';filename='stored-source.png'
+        def __init__(self,raw):self._raw=raw;self._pos=0
+        async def read(self,n=-1):
+            out=self._raw[self._pos:]if n is None or n<0 else self._raw[self._pos:self._pos+n];self._pos+=len(out);return out
+        async def seek(self,pos):self._pos=pos
+
+    @router.post('/fresh-review/{source}/private-display/reopen')
+    async def reopen_display(source:str,review:str=Form(...),x_vigilens_display_session:str=Header('')):
+        # Owner-bound reopen of an existing verified job: the pixels come from this
+        # account's own preserved source.png (same namespace as source_result), are
+        # re-verified (job read already verifies the artifact against the binding) and digest-checked, then flow through
+        # the SAME preparation/acknowledgment path as an upload. No listing, no
+        # download, no export, no provider call; a fresh /review acknowledgment is
+        # still required (nothing carries over from an earlier session).
+        try:
+            owner=_visitor_owner(x_vigilens_display_session)
+            job=source_result(source,owner)
+            raw=SERVICE._read_artifact(SERVICE._art(owner,source,'source.png'))
+            if decode_image(raw,'image/png').digest!=source:raise ValueError('Preserved source changed')
+        except (ValueError,KeyError,TypeError,OSError,sqlite3.Error,AuditError):raise HTTPException(409,'Stored source unavailable for this account; nothing reopened')
+        return await _prepare_display(source,_StoredSource(raw),review,x_vigilens_display_session)
+
+    async def _prepare_display(source,image,review,x_vigilens_display_session):
         try:
             job=source_result(source,_visitor_owner(x_vigilens_display_session));r=json.loads(review)
             if 'assessment_id'in r:raise ValueError('Fresh review uses job binding, not saved rooftop assessment')
