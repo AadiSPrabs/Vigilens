@@ -76,6 +76,40 @@ def _wire_face_proposals(service):
         service.face_proposal_model_path = face_model
 
 
+def _wire_stage_executors(service):
+    """Opt-in recheck / explanation executors for the Postgres boot path.
+
+    Off unless VIGILENS_STAGE_EXECUTORS=on (a spend-adjacent feature, so it is never
+    switched on by default). When on, an executor object is attached so the report can show
+    the exact plan hash; it still cannot reserve or dispatch without an exact, sha-pinned
+    grant document. A grant is supplied only through VIGILENS_RECHECK_GRANT_JSON /
+    VIGILENS_EXPLANATION_GRANT_JSON (the full grant JSON, written for one exact plan). This
+    function never creates a grant. Grant bytes go to a 0700 temp dir as 0600 files and are
+    pinned by sha256, exactly like the file-based local runtime."""
+    if os.environ.get('VIGILENS_STAGE_EXECUTORS', 'off').strip().lower() != 'on':
+        return
+    import hashlib
+    import tempfile
+    from fresh_review.explanation_execution import ExplanationExecutor
+    from fresh_review.recheck_execution import RecheckExecutor
+    base = Path(tempfile.mkdtemp(prefix='vigilens-grants-'))
+    os.chmod(base, 0o700)
+    for attr, env, cls, fname in (
+            ('recheck_executor', 'VIGILENS_RECHECK_GRANT_JSON', RecheckExecutor, 'recheck-grant.json'),
+            ('explanation_executor', 'VIGILENS_EXPLANATION_GRANT_JSON', ExplanationExecutor, 'explanation-grant.json')):
+        raw = os.environ.get(env, '').strip()
+        path = sha = None
+        if raw:
+            json.loads(raw)  # must at least be valid JSON; exact-shape checks happen at use
+            data = raw.encode('utf-8')
+            path = base / fname
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, 'wb') as f:
+                f.write(data)
+            sha = hashlib.sha256(data).hexdigest()
+        setattr(service, attr, cls(service, approval_path=path, approval_sha256=sha))
+
+
 def _wire_clip_limits(service):
     # Optional bounded local clip decoding, mirroring _wire_face_proposals: enabled
     # only when the operator sets VIGILENS_CLIP_LIMITS_JSON (see module docstring).
@@ -184,6 +218,7 @@ def main() -> None:
                                   seamless=True, transport=SyntheticTransport())
         _wire_face_proposals(service)
         _wire_clip_limits(service)
+        _wire_stage_executors(service)
         token = env_token or secrets.token_urlsafe(36)  # fail-closed random gate when unset
         origins = origins or ['http://localhost:5173']
         if transport_mode == 'meta':
