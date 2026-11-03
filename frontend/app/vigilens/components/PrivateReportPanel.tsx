@@ -5,12 +5,14 @@
 // never presents the PDF as released evidence.
 import { useEffect, useRef, useState } from "react";
 import type { Audit, PrivateDisplaySession } from "../types";
+import { RecheckLoopPanel } from "./RecheckLoopPanel";
 import {
   executeExplanation, reserveExplanation,
   fetchIntegrationContract,
   fetchPrivatePdfPreview,
   fetchPrivateReport,
   fetchPrivateReportDownload,
+  resultShaFromAuditId,
   type PersonReportReview,
   type PrivateReportDocument,
 } from "../api/backendClient";
@@ -131,6 +133,22 @@ export function PrivateReportPanel({ audit, session }: { audit: Audit; session: 
   // Reserve (not run) the exact current explanation plan. The backend needs
   // configured rules and an exact server-side grant for this plan sha; it creates
   // no grant and makes no provider call. Refusal is shown as-is, never retried.
+  // Refetch the gated report so the loop block shows the backend's current reserved/ready state.
+  const refreshReport = async () => {
+    const token = generation.current;
+    const sessionId = session.session_id;
+    const sourceDigest = session.source_digest;
+    try {
+      const contract = await fetchIntegrationContract(sourceDigest);
+      if (!live(token, sessionId, sourceDigest)) return;
+      const refreshed = await fetchPrivateReport(session, contract.assessment_id, reviews);
+      if (!live(token, sessionId, sourceDigest)) return;
+      setReport(refreshed);
+    } catch {
+      // The panel keeps its last shown state; nothing is retried automatically.
+    }
+  };
+
   const reservePlan = async () => {
     if (busy || explainBusy || downloadBusy) return;
     const token = ++generation.current;
@@ -320,6 +338,14 @@ export function PrivateReportPanel({ audit, session }: { audit: Audit; session: 
             </div>
           ) : null}
           {explainError ? <p className="mt-1 text-destructive">{explainError}</p> : null}
+          {report.bounded_review_loop && resultShaFromAuditId(audit.audit_id) ? (
+            <RecheckLoopPanel
+              sourceDigest={session.source_digest}
+              resultSha={resultShaFromAuditId(audit.audit_id) as string}
+              loop={report.bounded_review_loop}
+              onChanged={() => void refreshReport()}
+            />
+          ) : null}
           <p className="mt-1 text-muted-foreground">
             Configured rule review: {report.configured_rule_review?.status ?? "not evaluated"}.
           </p>

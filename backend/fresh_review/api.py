@@ -138,6 +138,14 @@ def create_router(service,display):
         except LiveTransportDisabled:raise HTTPException(503,'Recheck execution disabled; no claim or call created')
         except (ValueError,KeyError,TypeError,OSError,sqlite3.Error,AuditError):raise HTTPException(409,'Explicit recheck unavailable; no new reservation, grant or automatic retry')
 
+    def _pending_loop_attempts(source,owner,result_sha):
+        # Reserved-but-not-run attempts this owner already has for this exact source/result (at most 2). Read-only.
+        c=SERVICE.connect()
+        try:
+            if not c.execute("SELECT 1 FROM sqlite_master WHERE name='recheck_attempts'").fetchone():return[]
+            return[r[0]for r in c.execute("SELECT attempt_id FROM recheck_attempts WHERE owner=? AND source=? AND result_sha=? AND state='reserved_not_dispatched' ORDER BY created LIMIT 2",(owner,source,result_sha))]
+        finally:c.close()
+
     def _recheck_plan(source,person,owner):
         from .rechecks import plan_recheck
         job=source_result(source,owner)
@@ -191,9 +199,10 @@ def create_router(service,display):
         try:
             job=source_result(source,_visitor_owner(x_vigilens_display_session));current_preview(source,job,x_vigilens_display_session)
             if set(payload)!={'source_digest','result_sha256'}or payload['source_digest']!=source or payload['result_sha256']!=digest(job['result']):raise ValueError('Exact immutable original required')
-            configured=getattr(SERVICE,'review_loop_attempts',None)
-            if not isinstance(configured,dict)or source not in configured:raise ValueError('Explicit server-side bounded loop configuration required')
-            return await run_review_loop(SERVICE,source,attempt_ids=configured[source],owner=_visitor_owner(x_vigilens_display_session))
+            owner=_visitor_owner(x_vigilens_display_session);configured=getattr(SERVICE,'review_loop_attempts',None)
+            ids=list(configured[source])if isinstance(configured,dict)and source in configured else _pending_loop_attempts(source,owner,digest(job['result']))
+            if not ids:raise ValueError('No reserved exact attempt for this source')
+            return await run_review_loop(SERVICE,source,attempt_ids=ids,owner=owner)
         except LiveTransportDisabled:raise HTTPException(503,'Recheck execution disabled; no claim or call created')
         except (ValueError,KeyError,TypeError,OSError,sqlite3.Error,AuditError):raise HTTPException(409,'Configured exact recheck loop unavailable; no new grant/reservation or retry')
 
@@ -486,13 +495,16 @@ def create_router(service,display):
                     for attempt in attempts:attempt['content_review']=commentary_review(attempt,ppe_masks=current_ppe_masks(binding['source'],binding['result_sha256'],_visitor_owner(x_vigilens_display_session)))
                     out['spatial_explanations']={'status':'model_commentary_requires_human_review','attempts':attempts,'deterministic_fields_unchanged':True,'exact_plan_sha256':digest(plan),'reservation':'requires_exact_server_side_grant_for_this_plan_sha256','reservation_route':'/fresh-private-report/'+sid+'/explanation-reservation',
                         'input_basis_notice':'Missing auxiliary PPE masks means not supplied, not evidence that segmentation or PPE is absent. Commentary must be checked against the original pixels and reviewed geometry.'}
-                _loop=getattr(SERVICE,'review_loop_attempts',None)
-                if isinstance(_loop,dict)and binding['source']in _loop:
-                    out['bounded_review_loop']={'status':'configured_exact_attempts','attempt_count':len(_loop[binding['source']]),'route':'/fresh-review/'+binding['source']+'/bounded-review-loop','creates_grant_or_reservation':False,'automatic_candidate_adoption':False}
+                _loop=getattr(SERVICE,'review_loop_attempts',None);_owner=_visitor_owner(x_vigilens_display_session)
+                _pending=list(_loop[binding['source']])if isinstance(_loop,dict)and binding['source']in _loop else _pending_loop_attempts(binding['source'],_owner,binding['result_sha256'])
+                _unknown=[p['id']for p in out.get('persons',[])if isinstance(p,dict)and p.get('ppe_assessed',True)and any(p.get(k)=='unknown'for k in('helmet','vest'))]if isinstance(out.get('persons'),list)else[]
+                _base={'creates_grant_or_reservation':False,'automatic_candidate_adoption':False,'unknown_person_ids':_unknown,'plan_route':'/fresh-review/'+binding['source']+'/recheck-plan','reservation_route':'/fresh-review/'+binding['source']+'/recheck-reservation'}
+                if _pending:
+                    out['bounded_review_loop']={**_base,'status':'ready_reserved_attempts','attempt_count':len(_pending),'route':'/fresh-review/'+binding['source']+'/bounded-review-loop'}
                 else:
-                    out['bounded_review_loop']={'status':'blocked_no_configured_attempts','route':None,'creates_grant_or_reservation':False,'automatic_candidate_adoption':False,
-                        'blocked_until':'the owner approves a specific recheck plan and ceiling in words, the operator supplies the exact recheck grant, one attempt is reserved for this source, and that attempt id is listed in the server loop configuration',
-                        'note':'Absent configuration is a blocked plan, not a missing feature. The loop never creates a grant, reservation or attempt and never retries.'}
+                    out['bounded_review_loop']={**_base,'status':'blocked_no_reserved_attempts','route':None,
+                        'blocked_until':'the owner approves a specific recheck plan and ceiling in words, the operator supplies the exact recheck grant, and one attempt is reserved for an unknown person from the shown plan',
+                        'note':'Absent grant or reservation is a blocked plan, not a missing feature. The loop never creates a grant, reservation or attempt and never retries.'}
                 out['status']='needs_human_review' # No safety/release decisions.
                 return out
             except (ValueError,KeyError,TypeError,OSError,sqlite3.Error,AuditError):raise HTTPException(409,'Fresh private report source/person/preview binding changed')

@@ -37,10 +37,11 @@ separate approval with its own accounting plan.
 
 ## Recheck and bounded review loop (Render path)
 State ledger: implemented in code, configured only by the steps below, verified on host only when someone observes it there.
-1. The private report shows `bounded_review_loop`: `blocked_no_configured_attempts` (visible blocked plan, creates nothing) until configured.
+1. The private report shows `bounded_review_loop`: `blocked_no_reserved_attempts` (visible blocked plan, creates nothing) until configured.
 2. `POST /fresh-review/{source}/recheck-plan {"person_id": ...}` (acknowledged preview session) returns hashes only: plan_sha256, request_sha256, ceiling. No booking, no grant, no provider call. Crop pixels are never returned.
 3. The owner approves that plan and ceiling in words. `python make_recheck_grant.py --authority-reference REF < plan.json` prints the grant (stdout).
 4. Operator action: place it in VIGILENS_RECHECK_GRANT_JSON and restart (read at boot). `/recheck-plan` then shows `configured_grant_matches_this_plan: true`.
 5. `POST /fresh-review/{source}/recheck-reservation` checks the exact grant BEFORE booking, then holds the full reserve with no provider call. No grant means 409 and nothing booked. Repeat requests dedupe.
-6. Run the attempt via the existing recheck route, then list its attempt id in VIGILENS_REVIEW_LOOP_ATTEMPTS_JSON ({source: [ids]}) and restart. A mismatch leaves the loop unconfigured and prints the reason.
+6. The report's loop block turns to `ready_reserved_attempts` (the server reads this owner's reserved, not yet run attempts for the exact source and result; at most 2). "Run reserved attempts" calls `/bounded-review-loop`, which preflights every attempt against the pinned grant and then runs each once. A completed attempt is no longer pending, so a repeat is refused (no retry). No attempt-id env step and no second restart. VIGILENS_REVIEW_LOOP_ATTEMPTS_JSON remains an optional fixed override.
+All of steps 2, 5 and 6 are buttons in the report panel ("Bounded recheck loop"). Only step 4 is a dashboard action.
 No endpoint creates a grant. A reservation holds money against the ceiling and needs its own accounting approval.

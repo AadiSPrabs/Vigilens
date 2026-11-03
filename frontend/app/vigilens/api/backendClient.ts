@@ -509,6 +509,7 @@ export type PrivateReportDocument = {
   evidence_export_allowed?: boolean;
   spatial_explanations?: { status?: string; attempts?: unknown[]; exact_plan_sha256?: string; reservation?: string };
   configured_rule_review?: { status?: string };
+  bounded_review_loop?: { status?: string; attempt_count?: number; unknown_person_ids?: string[]; blocked_until?: string; note?: string; creates_grant_or_reservation?: boolean };
   notice?: string;
   [key: string]: unknown;
 };
@@ -776,6 +777,48 @@ export async function reserveExplanation(
     clearTimeout(timeoutId);
   }
 }
+
+export type RecheckPlanView = {
+  status: string;
+  reason?: string;
+  person_id: string;
+  plan_sha256?: string;
+  request_sha256?: string[];
+  max_reserved_usd?: string;
+  unknown_items?: unknown;
+  executor_configured?: boolean;
+  configured_grant_matches_this_plan?: boolean;
+  provider_calls_this_request: number;
+  reserved_nothing: boolean;
+  grant_created_here: boolean;
+};
+
+export type RecheckReservationView = { attempt_id: string; state: string; new_reservation: boolean; plan_sha256: string; held_usd: string; provider_calls_this_request: number; grant_created_here: boolean };
+
+async function postRecheckRoute<T>(sourceDigest: string, route: "recheck-plan" | "recheck-reservation", personId: string, fallback: string): Promise<T> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort("timeout"), TIMEOUT_MS);
+  try {
+    const response = await fetch(`/api/vigilens/fresh-review/${encodeURIComponent(sourceDigest)}/${route}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ person_id: personId }),
+      signal: controller.signal,
+    });
+    if (!response.ok) return readRefusal(response, fallback);
+    return (await response.json()) as T;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+// Visible exact plan for one person: hashes only, no booking, no grant, no provider call.
+export const fetchRecheckPlan = (sourceDigest: string, personId: string) =>
+  postRecheckRoute<RecheckPlanView>(sourceDigest, "recheck-plan", personId, "Recheck plan unavailable; nothing reserved or called");
+
+// Reserve (not run) one attempt. Refused unless the exact pinned grant for this plan exists server-side.
+export const reserveRecheck = (sourceDigest: string, personId: string) =>
+  postRecheckRoute<RecheckReservationView>(sourceDigest, "recheck-reservation", personId, "Recheck reservation unavailable; nothing reserved or called");
 
 const HEX64_SOURCE = /^[0-9a-f]{64}$/;
 

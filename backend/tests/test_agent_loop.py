@@ -30,7 +30,6 @@ def test_loop_http_server_owned_attempts_exact_preview_and_result(material,monke
  body={'source_digest':frame.digest,'result_sha256':digest(job['result'])}
  assert c.post(route,json=body).status_code==409
  x=prepare(c,raw,frame);acknowledge(c,x)
- assert c.post(route,json=body).status_code==409
  p.review_loop_attempts={frame.digest:[a['attempt_id']]}
  assert c.post(route,json={**body,'attempts':[a['attempt_id']]}).status_code==409
  out=c.post(route,json=body);assert out.status_code==200 and out.json()['attempts'][0]['state']=='completed'

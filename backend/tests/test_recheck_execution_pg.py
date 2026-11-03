@@ -125,13 +125,11 @@ def test_pg_loop_http_needs_server_config_acked_preview_and_exact_result(pg_mate
     body = {'source_digest': frame.digest, 'result_sha256': digest(job['result'])}
     assert c.post(route, json=body).status_code == 409                      # no acknowledged preview
     x = prepare(c, raw, frame); acknowledge(c, x)
-    assert c.post(route, json=body).status_code == 409                      # no server-side loop configuration
-    service.review_loop_attempts = {frame.digest: [a['attempt_id']]}
     assert c.post(route, json={**body, 'attempts': [a['attempt_id']]}).status_code == 409   # client cannot supply attempts
     other = {'X-Vigilens-Display-Session': 'cd' * 32}
     assert c.post(route, json=body, headers=other).status_code in (403, 409) and len(calls) == 2
     out = c.post(route, json=body); assert out.status_code == 200 and out.json()['attempts'][0]['state'] == 'completed'
-    assert c.post(route, json=body).status_code == 200 and len(calls) == 4
+    assert c.post(route, json=body).status_code == 409 and len(calls) == 4   # completed is no longer pending: no retry, no call
 
 
 # ---- Render boot configuration of the loop (env), fail closed
@@ -161,7 +159,7 @@ def test_pg_boot_loop_unset_shows_blocked_plan_not_missing_feature(pg_material, 
     x = prepare(c, raw, frame); acknowledge(c, x)
     doc = report(c, x, job).json()
     b = doc['bounded_review_loop']
-    assert b['status'] == 'blocked_no_configured_attempts' and b['route'] is None and b['creates_grant_or_reservation'] is False
+    assert b['status'] == 'blocked_no_reserved_attempts' and b['route'] is None and b['creates_grant_or_reservation'] is False
     assert 'owner approves a specific recheck plan' in b['blocked_until'] and len(calls) == 2
 
 
@@ -185,7 +183,7 @@ def test_pg_boot_loop_valid_config_runs_exact_attempt_over_http_once(pg_material
     assert service.review_loop_attempts == {frame.digest: [a['attempt_id']]}
     x = prepare(c, raw, frame); acknowledge(c, x)
     b = report(c, x, job).json()['bounded_review_loop']
-    assert b['status'] == 'configured_exact_attempts' and b['attempt_count'] == 1 and b['creates_grant_or_reservation'] is False
+    assert b['status'] == 'ready_reserved_attempts' and b['attempt_count'] == 1 and b['creates_grant_or_reservation'] is False
     route = '/fresh-review/' + frame.digest + '/bounded-review-loop'
     body = {'source_digest': frame.digest, 'result_sha256': digest(job['result'])}
     out = c.post(route, json=body); assert out.status_code == 200 and out.json()['attempts'][0]['state'] == 'completed' and len(calls) == 4
@@ -284,3 +282,25 @@ def test_recheck_grant_builder_output_is_accepted_by_executor_for_exact_plan(pg_
     for bad in ({**v, 'status': 'not_needed'}, {**v, 'plan_sha256': 'x'}, {**v, 'max_reserved_usd': '9'}, {**v, 'request_sha256': v['request_sha256'][:1]}):
         assert mk.main(['--authority-reference', 'r'], stdin=io.StringIO(json.dumps(bad))) == 2
     assert len(calls) == 2
+
+
+def test_pg_reserved_attempt_runs_through_loop_without_any_attempt_env(pg_material, monkeypatch):
+    # Normal flow: plan -> exact grant -> reserve -> loop runs the reserved pending attempt. No attempt-id env step.
+    from test_fresh_upload_routes import report
+    service, raw, frame, calls, c, job, run_render = _recheck_ready(pg_material, monkeypatch)
+    import fresh_review.recheck_execution as module
+
+    async def parse(*a, **k):
+        return {'objects': [{'object_id': '0', 'box_half_open': [0, 0, 20, 60], 'mask': Image.new('L', (20, 60), 255)}]}
+    monkeypatch.setattr(module, 'parse_sam_image_text', parse)
+    loop = '/fresh-review/' + frame.digest + '/bounded-review-loop'
+    body = {'source_digest': frame.digest, 'result_sha256': digest(job['result'])}
+    assert c.post(loop, json=body).status_code == 409 and len(calls) == 2            # nothing reserved: refuses, no call
+    v = c.post('/fresh-review/' + frame.digest + '/recheck-plan', json={'person_id': '0'}).json()
+    monkeypatch.setenv('VIGILENS_RECHECK_GRANT_JSON', json.dumps(_grant_for(service, v))); run_render._wire_stage_executors(service)
+    assert c.post('/fresh-review/' + frame.digest + '/recheck-reservation', json={'person_id': '0'}).status_code == 200
+    assert len(calls) == 2
+    r = c.post(loop, json=body); assert r.status_code == 200, r.text
+    out = r.json()
+    assert out['attempts'][0]['state'] == 'completed' and out['attempts'][0]['original_overwrite_allowed'] is False and len(calls) == 4
+    assert c.post(loop, json=body).status_code == 409 and len(calls) == 4             # completed is not pending: no retry, no new call
