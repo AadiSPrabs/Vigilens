@@ -17,7 +17,7 @@ synthetic grants only. Not run on Render. No live grant exists.
 3. The owner approves that specific plan in words. Nothing earlier counts as approval.
 4. The assistant formats the grant with `python backend/make_explanation_grant.py --plan-sha256 HEX
    --execution-scope SCOPE --authority-reference REF`. The tool only prints a document: it calls no provider,
-   reserves nothing, writes no file and logs nothing. It refuses a malformed hash or a different ceiling.
+   reserves nothing and writes no file. It PRINTS the grant to stdout, so mind where stdout goes (the grant is an approval document, not an API secret, but its integrity matters). It refuses a malformed hash or a different ceiling.
 5. The grant is placed in `VIGILENS_EXPLANATION_GRANT_JSON` (a Render dashboard action by the owner) and the
    service is restarted. The grant is read once at boot into a 0700 temp dir as a 0600 file and pinned by sha256.
    It covers one plan hash. A different plan, scope or ceiling is refused without a call.
@@ -34,3 +34,13 @@ See tests/test_render_stage_executors_pg.py and tests/test_recheck_execution_pg.
 ## Not covered
 Live provider behaviour, Render itself, Python 3.13, and any real grant. Money: each approved plan is a
 separate approval with its own accounting plan.
+
+## Recheck and bounded review loop (Render path)
+State ledger: implemented in code, configured only by the steps below, verified on host only when someone observes it there.
+1. The private report shows `bounded_review_loop`: `blocked_no_configured_attempts` (visible blocked plan, creates nothing) until configured.
+2. `POST /fresh-review/{source}/recheck-plan {"person_id": ...}` (acknowledged preview session) returns hashes only: plan_sha256, request_sha256, ceiling. No booking, no grant, no provider call. Crop pixels are never returned.
+3. The owner approves that plan and ceiling in words. `python make_recheck_grant.py --authority-reference REF < plan.json` prints the grant (stdout).
+4. Operator action: place it in VIGILENS_RECHECK_GRANT_JSON and restart (read at boot). `/recheck-plan` then shows `configured_grant_matches_this_plan: true`.
+5. `POST /fresh-review/{source}/recheck-reservation` checks the exact grant BEFORE booking, then holds the full reserve with no provider call. No grant means 409 and nothing booked. Repeat requests dedupe.
+6. Run the attempt via the existing recheck route, then list its attempt id in VIGILENS_REVIEW_LOOP_ATTEMPTS_JSON ({source: [ids]}) and restart. A mismatch leaves the loop unconfigured and prints the reason.
+No endpoint creates a grant. A reservation holds money against the ceiling and needs its own accounting approval.

@@ -110,6 +110,39 @@ def _wire_stage_executors(service):
         setattr(service, attr, cls(service, approval_path=path, approval_sha256=sha))
 
 
+def _wire_review_loop(service):
+    """Fail-closed Render configuration for the bounded review loop.
+
+    Set VIGILENS_REVIEW_LOOP_ATTEMPTS_JSON to {"<64-hex source>": ["<64-hex attempt id>", ...]} (1-2 ids each).
+    Every id must already exist as a reserved recheck attempt for that source and must pass the executor's own
+    grant check (pinned, scoped grant). This function never creates a grant, reservation or attempt and makes no
+    provider call. Any problem leaves the loop UNCONFIGURED (the report then shows a blocked plan) and prints
+    the reason; a bad value never takes the host down and never partially configures."""
+    raw = os.environ.get('VIGILENS_REVIEW_LOOP_ATTEMPTS_JSON', '').strip()
+    if not raw:
+        return
+    try:
+        cfg = json.loads(raw)
+        executor = getattr(service, 'recheck_executor', None)
+        if executor is None or getattr(executor, 'approval_path', None) is None:
+            raise ValueError('a configured recheck executor with an exact grant is required (VIGILENS_STAGE_EXECUTORS=on and a recheck grant)')
+        if not isinstance(cfg, dict) or not cfg:
+            raise ValueError('a non-empty JSON object is required')
+        for source, ids in cfg.items():
+            if not isinstance(source, str) or len(source) != 64 or any(ch not in '0123456789abcdef' for ch in source):
+                raise ValueError('each key must be an exact 64-hex source digest')
+            if not isinstance(ids, list) or not 1 <= len(ids) <= 2 or any(not isinstance(i, str) or len(i) != 64 for i in ids):
+                raise ValueError('each source needs 1-2 exact attempt ids')
+            for identity in ids:
+                attempt = executor.read(identity)
+                if attempt['plan']['source_digest'] != source:
+                    raise ValueError('an attempt id does not belong to its source')
+                executor.approval(attempt)
+        service.review_loop_attempts = cfg
+    except Exception as e:  # noqa: BLE001 - fail closed to unconfigured, with the reason on stdout
+        print('Vigilens review loop NOT configured: %s' % e, flush=True)
+
+
 def _wire_clip_limits(service):
     # Optional bounded local clip decoding, mirroring _wire_face_proposals: enabled
     # only when the operator sets VIGILENS_CLIP_LIMITS_JSON (see module docstring).
@@ -219,6 +252,7 @@ def main() -> None:
         _wire_face_proposals(service)
         _wire_clip_limits(service)
         _wire_stage_executors(service)
+        _wire_review_loop(service)
         token = env_token or secrets.token_urlsafe(36)  # fail-closed random gate when unset
         origins = origins or ['http://localhost:5173']
         if transport_mode == 'meta':

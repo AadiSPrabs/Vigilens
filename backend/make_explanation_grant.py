@@ -1,10 +1,13 @@
-"""Build the exact explanation grant document for ONE plan, after the owner approved that plan in words.
+"""Format the exact explanation grant document for ONE plan, after the owner approved that plan in words.
 
-This tool only formats a document. It never calls a provider, reserves anything, writes files or logs.
-The grant is inert until the operator places the printed JSON in VIGILENS_EXPLANATION_GRANT_JSON and the
-service is restarted with VIGILENS_STAGE_EXECUTORS=on. It covers one plan_sha256 and one cost ceiling.
+This tool only formats a document and PRINTS it to stdout (so it lands wherever stdout goes; the grant is an
+approval document, not an API secret, but treat its integrity as important). It never calls a provider,
+reserves anything or writes files. It authorizes nothing by itself: the grant is inert until the operator places
+the JSON in VIGILENS_EXPLANATION_GRANT_JSON and the service restarts with VIGILENS_STAGE_EXECUTORS=on.
+It covers one plan_sha256 and one cost ceiling.
 
 Usage: python make_explanation_grant.py --plan-sha256 HEX64 --execution-scope SCOPE --authority-reference REF
+For a recheck grant use make_recheck_grant.py with the output of POST /fresh-review/{source}/recheck-plan.
 """
 import argparse
 import json

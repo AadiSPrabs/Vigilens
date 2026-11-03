@@ -138,6 +138,53 @@ def create_router(service,display):
         except LiveTransportDisabled:raise HTTPException(503,'Recheck execution disabled; no claim or call created')
         except (ValueError,KeyError,TypeError,OSError,sqlite3.Error,AuditError):raise HTTPException(409,'Explicit recheck unavailable; no new reservation, grant or automatic retry')
 
+    def _recheck_plan(source,person,owner):
+        from .rechecks import plan_recheck
+        job=source_result(source,owner)
+        raw=SERVICE._read_artifact(SERVICE._art(owner,source,'source.png'))
+        return job,plan_recheck(raw,job['result'],person,attempts_so_far=0,max_attempts=1)
+
+    @router.post('/fresh-review/{source}/recheck-plan')
+    async def recheck_plan(source:str,payload:dict,x_vigilens_display_session:str=Header('')):
+        # VISIBLE exact plan for one person: no booking, no grant, no provider call. Canonical requests carry
+        # original crop pixels and are never returned; only their hashes are, so an operator can grant exactly this plan.
+        try:
+            from .recheck_journal import RECHECK_RESERVE
+            owner=_visitor_owner(x_vigilens_display_session)
+            job=source_result(source,owner);current_preview(source,job,x_vigilens_display_session)
+            if set(payload)!={'person_id'}or not isinstance(payload['person_id'],str):raise ValueError('Exact person required')
+            job,plan=_recheck_plan(source,payload['person_id'],owner)
+            base={'person_id':payload['person_id'],'provider_calls_this_request':0,'reserved_nothing':True,'grant_created_here':False}
+            if plan.get('status')!='planned_not_authorised_or_dispatched':return {**base,'status':plan.get('status'),'reason':plan.get('reason')}
+            executor=getattr(SERVICE,'recheck_executor',None)
+            try:
+                if executor is None:raise ValueError('none')
+                executor.approval({'plan':plan});matches=True
+            except (ValueError,KeyError,TypeError,OSError):matches=False
+            return {**base,'status':'planned_requires_exact_grant','source_digest':source,'result_sha256':plan['result_sha256'],'plan_sha256':digest(plan),
+                'request_sha256':[st['request_sha256']for st in plan['steps']],'unknown_items':plan['unknown_items'],'max_reserved_usd':str(RECHECK_RESERVE),
+                'grant_format':'vigilens.exact-recheck-approval.v1','execution_scope':SERVICE.execution_scope,'executor_configured':executor is not None,
+                'configured_grant_matches_this_plan':matches,'requests_withheld':'canonical requests contain original crop pixels and are never returned'}
+        except (ValueError,KeyError,TypeError,OSError,sqlite3.Error,AuditError):raise HTTPException(409,'Recheck plan unavailable for this source/person; nothing reserved or called')
+
+    @router.post('/fresh-review/{source}/recheck-reservation')
+    async def recheck_reservation(source:str,payload:dict,x_vigilens_display_session:str=Header('')):
+        # Reserve (not run) one exact attempt. The exact pinned grant for THIS plan is checked BEFORE anything is booked;
+        # without it nothing is reserved. No grant is created here and no provider call is made.
+        try:
+            from .recheck_journal import RecheckJournal,RECHECK_RESERVE
+            owner=_visitor_owner(x_vigilens_display_session)
+            executor=getattr(SERVICE,'recheck_executor',None)
+            if executor is None:raise ValueError('No exact recheck executor configured')
+            job=source_result(source,owner);current_preview(source,job,x_vigilens_display_session)
+            if set(payload)!={'person_id'}or not isinstance(payload['person_id'],str):raise ValueError('Exact person required')
+            job,plan=_recheck_plan(source,payload['person_id'],owner)
+            doc=executor.approval({'plan':plan})
+            attempt=RecheckJournal(SERVICE).reserve(source,payload['person_id'],max_attempts=1,authority_reference=doc['authority_reference'],owner=owner)
+            return {'attempt_id':attempt['attempt_id'],'state':attempt['state'],'new_reservation':attempt['new_reservation'],'plan_sha256':digest(plan),
+                'held_usd':str(RECHECK_RESERVE),'provider_calls_this_request':0,'grant_created_here':False}
+        except (ValueError,KeyError,TypeError,OSError,sqlite3.Error,AuditError):raise HTTPException(409,'Recheck reservation unavailable: an exact pinned grant for this plan is required; nothing reserved or called')
+
     @router.post('/fresh-review/{source}/bounded-review-loop')
     async def bounded_review_loop(source:str,payload:dict,x_vigilens_display_session:str=Header('')):
         from .agent_loop import run_review_loop
@@ -439,6 +486,13 @@ def create_router(service,display):
                     for attempt in attempts:attempt['content_review']=commentary_review(attempt,ppe_masks=current_ppe_masks(binding['source'],binding['result_sha256'],_visitor_owner(x_vigilens_display_session)))
                     out['spatial_explanations']={'status':'model_commentary_requires_human_review','attempts':attempts,'deterministic_fields_unchanged':True,'exact_plan_sha256':digest(plan),'reservation':'requires_exact_server_side_grant_for_this_plan_sha256','reservation_route':'/fresh-private-report/'+sid+'/explanation-reservation',
                         'input_basis_notice':'Missing auxiliary PPE masks means not supplied, not evidence that segmentation or PPE is absent. Commentary must be checked against the original pixels and reviewed geometry.'}
+                _loop=getattr(SERVICE,'review_loop_attempts',None)
+                if isinstance(_loop,dict)and binding['source']in _loop:
+                    out['bounded_review_loop']={'status':'configured_exact_attempts','attempt_count':len(_loop[binding['source']]),'route':'/fresh-review/'+binding['source']+'/bounded-review-loop','creates_grant_or_reservation':False,'automatic_candidate_adoption':False}
+                else:
+                    out['bounded_review_loop']={'status':'blocked_no_configured_attempts','route':None,'creates_grant_or_reservation':False,'automatic_candidate_adoption':False,
+                        'blocked_until':'the owner approves a specific recheck plan and ceiling in words, the operator supplies the exact recheck grant, one attempt is reserved for this source, and that attempt id is listed in the server loop configuration',
+                        'note':'Absent configuration is a blocked plan, not a missing feature. The loop never creates a grant, reservation or attempt and never retries.'}
                 out['status']='needs_human_review' # No safety/release decisions.
                 return out
             except (ValueError,KeyError,TypeError,OSError,sqlite3.Error,AuditError):raise HTTPException(409,'Fresh private report source/person/preview binding changed')
