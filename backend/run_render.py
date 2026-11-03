@@ -66,6 +66,12 @@ def _wire_face_proposals(service):
     # lives in fresh_review/face_proposals.py; a mismatched file fails closed.
     # The aid never creates regions, never applies treatment, and never spends.
     face_model = os.environ.get('VIGILENS_FACE_MODEL_PATH', '').strip()
+    if not face_model:
+        # Bundled pinned model (MIT, OpenCV Zoo YuNet 2023mar). The sha256 pin in
+        # fresh_review/face_proposals.py still applies; a mismatch fails closed.
+        bundled = Path(__file__).resolve().parent / 'models' / 'face_detection_yunet_2023mar.onnx'
+        if bundled.is_file():
+            face_model = str(bundled)
     if face_model:
         service.face_proposal_model_path = face_model
 
