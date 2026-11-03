@@ -27,7 +27,7 @@ Severity and rule evaluation are deterministic and operator-configured. They are
 - **SAM 3.1** and **Muse Spark 1.3** through the Meta Model API (`https://api.meta.ai/v1/responses`): requests set `store: false`, send no tools, and the transport makes one attempt with no automatic retry. The default transport is disabled; no API key or live approval ships in this repository.
 - **Muse Code**: development assistance during the build.
 
-Tests and demos in this repository use a synthetic transport and make no provider calls.
+The tests and sample data in this repository use a synthetic transport and make no provider calls. The separately delivered demo video also shows one live run on the hosted prototype, using a generated image and real Meta Model API calls (SAM 3.1 and Muse Spark 1.3) with the developer's own key. That run is not part of the repository's tests, and its result is an unvalidated model observation.
 
 ## Status (read this)
 
@@ -36,14 +36,14 @@ Tests and demos in this repository use a synthetic transport and make no provide
 - A clean **production build is not verified** (the build ran out of memory on a 2 GB machine).
 - Raw-upload omission from report traffic has not been verified end to end.
 - Accuracy on real footage has not been measured. Nothing here is a safety, privacy or compliance guarantee.
-- No deployment is triggered by this branch.
+- A hosted prototype tracks the separate branch `render-trial-candidate` (commit 85bc1118 when the demo was recorded) at https://vigilens-frontend.onrender.com/. This README update leaves that hosting branch unchanged. On that host, manual black-region masking, whole-frame acknowledgment and a private PDF preview were run in a browser on 3 November 2026. Face proposals were unavailable there (the request returned 409), so the masking shown was manual. The report showed rules, explanations and re-checks as not configured, and export stayed off. The host's backend build version was not verified.
 
 ## Repository layout
 
 ```
 backend/    Python pipeline, review/report/rules services, tests
 frontend/   React dashboard: zone drawing, review, private report, rule entry
-RENDER-RUNBOOK.md, render.yaml   deployment notes (not run for this branch)
+RENDER-RUNBOOK.md, render.yaml   deployment notes (used for the hosted prototype on `render-trial-candidate`)
 ```
 
 Older notes inside `backend/` (for example `RUNNING.md`, `STATUS.md`) predate later work and may be out of date. `backend/FRESH-REVIEW.md` describes the review pipeline.
@@ -56,7 +56,7 @@ The concept was first written down on 26 October 2026. The frontend dashboard (u
 
 - Event: [Meta Global AI Developer Hackathon](https://cerebralvalley.ai/e/meta-ai-developer-hackathon) (Cerebral Valley x Meta)
 - Track: Indie Developer
-- Demo: a narrated screenshot walkthrough using synthetic data, submitted through the Cerebral Valley portal.
+- Demo: a narrated recorded walkthrough (about 3 minutes) of the hosted prototype on generated images, with manual masking shown, prepared for submission through the Cerebral Valley portal.
 
 ## Data and licences
 
