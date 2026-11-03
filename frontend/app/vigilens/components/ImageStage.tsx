@@ -18,6 +18,7 @@ type Props = {
   drawing?: boolean;
   readOnly?: boolean;
   caption?: ReactNode;
+  onImageError?: (() => void) | undefined;
 };
 
 const pts = (points: Point[]) => points.map((p) => `${p.x},${p.y}`).join(" ");
@@ -40,6 +41,7 @@ export function ImageStage({
   drawing = false,
   readOnly = false,
   caption,
+  onImageError,
 }: Props) {
   const imgRef = useRef<HTMLImageElement>(null);
   const [hover, setHover] = useState<Point | null>(null);
@@ -99,6 +101,7 @@ export function ImageStage({
             src={imageUrl}
             alt={imageAlt}
             draggable={false}
+            onError={onImageError}
             style={{ display: "block", maxWidth: "100%", height: "auto" }}
           />
           <svg

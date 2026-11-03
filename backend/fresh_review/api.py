@@ -497,7 +497,7 @@ def create_router(service,display):
                         'input_basis_notice':'Missing auxiliary PPE masks means not supplied, not evidence that segmentation or PPE is absent. Commentary must be checked against the original pixels and reviewed geometry.'}
                 _loop=getattr(SERVICE,'review_loop_attempts',None);_owner=_visitor_owner(x_vigilens_display_session)
                 _pending=list(_loop[binding['source']])if isinstance(_loop,dict)and binding['source']in _loop else _pending_loop_attempts(binding['source'],_owner,binding['result_sha256'])
-                _unknown=[p['id']for p in out.get('persons',[])if isinstance(p,dict)and p.get('ppe_assessed',True)and any(p.get(k)=='unknown'for k in('helmet','vest'))]if isinstance(out.get('persons'),list)else[]
+                _unknown=[p['id']for p in job['result']['persons']if p.get('ppe_assessed',True)and any(p.get(k)=='unknown'for k in('helmet','vest'))]
                 _base={'creates_grant_or_reservation':False,'automatic_candidate_adoption':False,'unknown_person_ids':_unknown,'plan_route':'/fresh-review/'+binding['source']+'/recheck-plan','reservation_route':'/fresh-review/'+binding['source']+'/recheck-reservation'}
                 if _pending:
                     out['bounded_review_loop']={**_base,'status':'ready_reserved_attempts','attempt_count':len(_pending),'route':'/fresh-review/'+binding['source']+'/bounded-review-loop'}

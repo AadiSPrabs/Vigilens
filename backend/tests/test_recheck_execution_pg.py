@@ -160,6 +160,7 @@ def test_pg_boot_loop_unset_shows_blocked_plan_not_missing_feature(pg_material, 
     doc = report(c, x, job).json()
     b = doc['bounded_review_loop']
     assert b['status'] == 'blocked_no_reserved_attempts' and b['route'] is None and b['creates_grant_or_reservation'] is False
+    assert b['unknown_person_ids'] == ['0'] and b['plan_route'].endswith('/recheck-plan')   # same persons the loop would recheck
     assert 'owner approves a specific recheck plan' in b['blocked_until'] and len(calls) == 2
 
 

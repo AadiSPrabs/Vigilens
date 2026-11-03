@@ -7,6 +7,7 @@ import { PrivateReportPanel } from "@/vigilens/components/PrivateReportPanel";
 import { ZoneReviewPanel } from "@/vigilens/components/ZoneReviewPanel";
 import { ClipPanel } from "@/vigilens/components/ClipPanel";
 import { executeRecheck } from "@/vigilens/api/backendClient";
+import { storedStageImageUrl } from "@/vigilens/storedStage";
 import type { PrivateDisplaySession, RecheckAttempt } from "@/vigilens/types";
 import { Inspector } from "@/vigilens/components/Inspector";
 import { PrintReport } from "@/vigilens/components/PrintReport";
@@ -129,6 +130,17 @@ export default function VigilensRoute() {
   const previewFile = source?.kind === "upload" ? source.file : null;
   const previewRequired = !!audit && audit.source === "backend" && !!audit.image.pixel_digest && !!audit.rechecks && (previewFile !== null || storedSource);
   const previewReady = !!previewSession && !!audit?.image.pixel_digest && previewSession.source_digest === audit.image.pixel_digest;
+  // Stored mode: the original is never returned, so the stage shows ONLY the acknowledged treated preview, and only
+  // while that exact session is bound to this stored source and audit. Expiry, a changed source, a discard or a
+  // load error clears it; there is no fallback to the original.
+  const storedStageUrl = storedStageImageUrl(source, previewSession, previewReady);
+  const stageUrl = source?.imageUrl ?? storedStageUrl;
+  useEffect(() => {
+    if (!storedStageUrl || !previewSession) return undefined;
+    const ttl = typeof previewSession.expires_in_seconds === "number" ? previewSession.expires_in_seconds : 600;
+    const timer = window.setTimeout(() => setPreviewSession(null), Math.max(1, ttl - 5) * 1000);
+    return () => window.clearTimeout(timer);
+  }, [storedStageUrl, previewSession]);
 
   const startDraft = () => setDraft({ points: [], name: "", hazard: false, error: null });
 
@@ -191,8 +203,9 @@ export default function VigilensRoute() {
         <div className="grid flex-1 grid-cols-1 items-start gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_380px]">
           <div className="flex min-w-0 flex-col gap-4">
             <ImageStage
-              imageUrl={source?.imageUrl ?? null}
-              imageAlt={source?.kind === "sample" ? `${SAMPLES.find((s) => s.id === source.sampleId)?.label} site scene` : `Uploaded photo ${source?.kind === "upload" ? source.name : ""}`}
+              imageUrl={stageUrl}
+              onImageError={storedStageUrl ? () => setPreviewSession(null) : undefined}
+              imageAlt={source?.kind === "stored" ? "Treated preview (masked regions black), not the original photo" : source?.kind === "sample" ? `${SAMPLES.find((s) => s.id === source.sampleId)?.label} site scene` : `Uploaded photo ${source?.kind === "upload" ? source.name : ""}`}
               zones={displayZones}
               persons={audit ? audit.persons : null}
               selectedPersonId={selectedPersonId}
@@ -201,7 +214,9 @@ export default function VigilensRoute() {
               onAddPoint={addPoint}
               drawing={draft !== null}
               caption={
-                audited ? (
+                storedStageUrl ? (
+                  <span>Treated preview you acknowledged, shown for zone drawing only. The original is never shown. Not evidence.</span>
+                ) : audited ? (
                   <span>Preview only, not evidence. Masked evidence unavailable.</span>
                 ) : source ? (
                   <span>Zones are operator-drawn. The app does not infer them.</span>
