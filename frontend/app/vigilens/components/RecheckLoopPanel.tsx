@@ -12,12 +12,13 @@ import {
 
 type Loop = { status?: string; attempt_count?: number; unknown_person_ids?: string[]; blocked_until?: string; note?: string };
 
-export function RecheckLoopPanel({ sourceDigest, resultSha, loop, onChanged }: { sourceDigest: string; resultSha: string; loop: Loop; onChanged: () => void }) {
+export function RecheckLoopPanel({ sourceDigest, resultSha, loop, onChanged, labelFor }: { sourceDigest: string; resultSha: string; loop: Loop; onChanged: () => void; labelFor?: (id: string) => string }) {
   const [plans, setPlans] = useState<Record<string, RecheckPlanView>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loopResult, setLoopResult] = useState<BoundedLoopResult | null>(null);
   const unknown = loop.unknown_person_ids ?? [];
+  const nameOf = (id: string) => (labelFor ? labelFor(id) : `Person ${id}`);
   const ready = loop.status === "ready_reserved_attempts";
 
   const act = async (key: string, fn: () => Promise<string>) => {
@@ -37,14 +38,14 @@ export function RecheckLoopPanel({ sourceDigest, resultSha, loop, onChanged }: {
     act("plan:" + person, async () => {
       const plan = await fetchRecheckPlan(sourceDigest, person);
       setPlans((p) => ({ ...p, [person]: plan }));
-      return plan.status === "planned_requires_exact_grant" ? `Plan for person ${person} shown. Nothing reserved, no call made.` : `No recheck plan for person ${person}: ${plan.reason ?? plan.status}.`;
+      return plan.status === "planned_requires_exact_grant" ? `Plan for ${nameOf(person)} shown. Nothing reserved, no call made.` : `No recheck plan for ${nameOf(person)}: ${plan.reason ?? plan.status}.`;
     });
 
   const reserve = (person: string) =>
     act("reserve:" + person, async () => {
       const r = await reserveRecheck(sourceDigest, person);
       onChanged();
-      return `Reserved ${r.held_usd} USD ceiling for person ${person} (${r.new_reservation ? "new hold" : "already reserved"}). Provider calls made: ${r.provider_calls_this_request}. Run it below.`;
+      return `Reserved ${r.held_usd} USD ceiling for ${nameOf(person)} (${r.new_reservation ? "new hold" : "already reserved"}). Provider calls made: ${r.provider_calls_this_request}. Run it below.`;
     });
 
   const run = () =>
@@ -73,7 +74,7 @@ export function RecheckLoopPanel({ sourceDigest, resultSha, loop, onChanged }: {
           const planned = plan?.status === "planned_requires_exact_grant";
           return (
             <div key={person} className="mt-1 rounded border p-2">
-              <p>Person {person}: helmet or vest reading unknown.</p>
+              <p>{nameOf(person)}: helmet or vest reading unknown.</p>
               <button type="button" className="mt-1 rounded border px-3 py-1 disabled:opacity-50" disabled={busy !== null} onClick={() => void showPlan(person)}>
                 {busy === "plan:" + person ? "Loading plan..." : "Show exact recheck plan"}
               </button>

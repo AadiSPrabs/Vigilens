@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Audit, PrivateDisplaySession } from "../types";
 import { RecheckLoopPanel } from "./RecheckLoopPanel";
+import { personLabel } from "../format";
 import {
   executeExplanation, reserveExplanation,
   fetchIntegrationContract,
@@ -50,6 +51,13 @@ export function PrivateReportPanel({ audit, session }: { audit: Audit; session: 
       return { ...current, [personId]: { ...existing, [key]: !existing[key] } };
     });
     setDone(false);
+  };
+
+  // Same labels the stage outlines and findings list use (Person N, 1-based by position), with the backend id
+  // beside it, so a reviewer can tie each attestation to the outlined figure instead of guessing.
+  const labelFor = (id: string) => {
+    const index = audit.persons.findIndex((p) => p.id === id);
+    return index >= 0 ? `${personLabel(audit.persons[index]!, index)} (backend id ${id}, the outlined figure with this label)` : `Person (backend id ${id})`;
   };
 
   const [report, setReport] = useState<PrivateReportDocument | null>(null);
@@ -240,7 +248,7 @@ export function PrivateReportPanel({ audit, session }: { audit: Audit; session: 
       <div className="mt-2 flex flex-col gap-3">
         {audit.persons.map((person) => (
           <fieldset key={person.id} className="rounded border p-2">
-            <legend className="px-1 font-medium">Person {person.id}</legend>
+            <legend className="px-1 font-medium">{labelFor(person.id)}</legend>
             {FIELD_LABELS.map(({ key, label }) => (
               <label key={key} className="mt-1 flex items-center gap-2">
                 <input
@@ -343,6 +351,7 @@ export function PrivateReportPanel({ audit, session }: { audit: Audit; session: 
               sourceDigest={session.source_digest}
               resultSha={resultShaFromAuditId(audit.audit_id) as string}
               loop={report.bounded_review_loop}
+              labelFor={labelFor}
               onChanged={() => void refreshReport()}
             />
           ) : null}

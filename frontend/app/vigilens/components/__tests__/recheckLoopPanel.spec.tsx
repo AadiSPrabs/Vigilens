@@ -54,3 +54,13 @@ describe("RecheckLoopPanel", () => {
     expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("person labels match the stage", () => {
+  it("names the person with the same label the outlined figure uses plus the backend id", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => json(planBody(false)));
+    await mount({ status: "blocked_no_reserved_attempts", unknown_person_ids: ["0"] });
+    expect(host!.textContent).toContain("Person 0: helmet or vest reading unknown."); // fallback without a label map
+    await act(async () => { root!.render(createElement(RecheckLoopPanel, { sourceDigest: SRC, resultSha: RES, loop: { status: "blocked_no_reserved_attempts", unknown_person_ids: ["0"] }, onChanged: () => {}, labelFor: (id: string) => `Person 1 (backend id ${id}, the outlined figure with this label)` })); });
+    expect(host!.textContent).toContain("Person 1 (backend id 0, the outlined figure with this label): helmet or vest reading unknown.");
+  });
+});
