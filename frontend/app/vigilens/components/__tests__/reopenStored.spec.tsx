@@ -41,6 +41,8 @@ describe("ReopenPanel", () => {
     const onReopen = vi.fn().mockResolvedValue(undefined);
     await mountEl(createElement(ReopenPanel, { onReopen }));
     const input = container.querySelector("input") as HTMLInputElement;
+    expect(container.textContent).toContain("original photo is never shown or returned");
+    expect(container.textContent).not.toContain("not shown until you prepare and acknowledge");
     await type(input, "abc123");
     expect(btn("Reopen")!.disabled).toBe(true);
     expect(container.textContent).toContain("exactly 64 hex");

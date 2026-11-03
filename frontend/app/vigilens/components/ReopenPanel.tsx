@@ -5,7 +5,7 @@ const HEX64 = /^[0-9a-f]{64}$/;
 // Reopen a job THIS account already ran, by its exact 64-character source digest.
 // Stored-only: no analysis, no provider call, no listing of other jobs, no image
 // download. A miss (unknown digest, another account's job, missing preserved
-// source) opens nothing. Pixels only ever appear through the treated preview.
+// source) opens nothing. The original is never returned; only a treated preview is shown, for inspection before acknowledgment.
 export function ReopenPanel(props: { onReopen: (digest: string) => Promise<void>; disabled?: boolean }) {
   const { onReopen, disabled } = props;
   const [draft, setDraft] = useState("");
@@ -57,7 +57,7 @@ export function ReopenPanel(props: { onReopen: (digest: string) => Promise<void>
           {busy ? "Reopening..." : "Reopen"}
         </button>
         <span>
-          Shows the stored result only. Nothing is analysed or charged, and the photo is not shown until you prepare and acknowledge a treated preview.
+          Shows the stored result only. Nothing is analysed or charged. The original photo is never shown or returned here; you inspect a treated copy first, and acknowledging it unlocks the report, zones and rules.
         </span>
       </form>
       {draft && !valid ? <p className="mt-1">A digest is exactly 64 hex characters (0-9, a-f).</p> : null}

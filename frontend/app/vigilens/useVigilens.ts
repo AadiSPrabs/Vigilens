@@ -174,7 +174,7 @@ export function useVigilens(announce: (text: string) => void) {
       const clean = digest.trim().toLowerCase();
       const audit = validateAudit(await reopenStoredAudit(clean, []));
       dispatch({ type: "reopened", source: { kind: "stored", imageUrl: null, name: `Stored job ${clean.slice(0, 12)}`, digest: clean }, audit, loadedAt: formatClock(new Date()) });
-      announce("Stored job reopened. Nothing was analysed. Prepare and acknowledge a treated preview before any private report, zones or rules.");
+      announce("Stored job reopened. Nothing was analysed. Prepare a treated preview, inspect it, then acknowledge it to unlock the private report, zones and rules.");
     },
     [announce],
   );
