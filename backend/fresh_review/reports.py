@@ -28,6 +28,7 @@ def build_private_report(assessment, derivative, review, *, full_frame_review=No
             if type(actual)is not type(value):raise ValueError('Strict whole-frame review types required')
             if type(value)is not bool and actual!=value:raise ValueError('Whole-frame review identity changed')
         frame_reviewed=all(full_frame_review[k]is True for k in ['foreground_checked','background_checked','reflections_checked','derivative_checked'])
+    image_withheld=derivative.get('image_withheld')
     result=[]
     for person in persons:
         fields=checks[person['id']]
@@ -37,17 +38,23 @@ def build_private_report(assessment, derivative, review, *, full_frame_review=No
         evidence=assess_evidence(source_digest=expected[1],derivative_sha256=expected[2],regions_digest=expected[3],person_id=person['id'],helmet_observation=verdict,**{k:fields[k]for k in ['exact_source_confirmed','face_coverage_checked','head_evidence_visible']})
         if not frame_reviewed:
             evidence.update(display_finding_allowed=False,evidence_status='needs_human_review',whole_frame_review_missing_or_unchecked=True)
+        if image_withheld is not None:
+            # Withheld pixels cannot support any displayed finding.
+            evidence.update(display_finding_allowed=False,evidence_status='image_withheld_by_operator',head_evidence_visible=False,evidence_claims_not_applicable_image_withheld=True)
         torso=fields.get('torso_evidence_visible',False)
         if type(torso)is not bool:raise ValueError('Explicit torso visibility boolean required')
         vest_raw=person.get('vest','unknown');vest=effective_value(person,'vest')
         if vest_raw not in ('present','absent','unknown'):raise ValueError('Stored vest observation enum required')
-        vest_allowed=frame_reviewed and fields['exact_source_confirmed']and fields['face_coverage_checked']and torso and vest!='unknown'
+        vest_allowed=frame_reviewed and image_withheld is None and fields['exact_source_confirmed']and fields['face_coverage_checked']and torso and vest!='unknown'
         result.append({'person_id':person['id'],'provider_helmet_observation':verdict_raw,'ppe_basis':person_summary(person),'ppe_assessed':person.get('ppe_assessed',True),'geometry_status':person.get('geometry_status','mask_verified'),'ppe_evidence_status':person.get('ppe_evidence_status','provider_observed'),'crop_eligibility':deepcopy(person.get('crop_eligibility')),
                        'report_display_helmet':verdict if evidence['display_finding_allowed'] else 'unknown',
                        'provider_vest_observation':vest_raw,'report_display_vest':vest if vest_allowed else'unknown',
-                       'vest_evidence_review':{'torso_evidence_visible':torso,'display_finding_allowed':vest_allowed,'basis':'operator_evidence_claim_only'},
+                       'vest_evidence_review':{'torso_evidence_visible':(False if image_withheld is not None else torso),'display_finding_allowed':vest_allowed,'basis':'operator_evidence_claim_only'},
                        'evidence_review':evidence,'status':'operator_reviewed_private_only' if evidence['display_finding_allowed']and vest_allowed else 'needs_human_review'})
-    return {'source':'private_report_preview_not_released','assessment_source':assessment['source'],'current_assessment_binding':deepcopy(assessment.get('current_assessment_binding')),
+    withhold_view=None
+    if image_withheld is not None:
+        withhold_view={'election':deepcopy(image_withheld),'basis':'operator_election_not_privacy_validation','geometrically_verified':False,'ppe_display':'withheld','meaning':'Operator elected to withhold the image: full-frame opaque redaction applied as a privacy fallback. This is not face-area masking, not a shield attestation, and NOT evidence that the image contains no faces - genuine zero-face verification remains unproven. PPE observations from this image are withheld from display; deterministic status and internal review state are unchanged. No safety clearance, export off.'}
+    return {'source':'private_report_preview_not_released','assessment_source':assessment['source'],'image_withheld':withhold_view,'current_assessment_binding':deepcopy(assessment.get('current_assessment_binding')),
             'ppe_summary_status':assessment.get('ppe_attempt_status','not_assessed'if assessment['source']=='current_verified_sam_only_review'else'preserved_provider_observations'),
             'ppe_basis_counts':basis_counts(persons),'ppe_stage':deepcopy(assessment.get('ppe_stage')),'sam_configuration':deepcopy(assessment.get('sam_configuration')),'sam_configuration_sha256':assessment.get('sam_configuration_sha256'),
             'manual_contact_review':deepcopy(assessment.get('manual_contact_review',{})),'automatic_contact':False,'compliance_decision':False,'assessment_id':expected[0],'source_digest':expected[1],

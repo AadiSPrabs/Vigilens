@@ -39,6 +39,9 @@ def _synthetic_pipeline(tmp_path, monkeypatch, cap='5'):
 
 def _live_pipeline(tmp_path, monkeypatch, cap='5'):
     _parse(monkeypatch)
+    # The pre-journal BYOK gate (pipeline._live_dispatch_preflight) is part of the live
+    # dispatch contract: these tests exercise the gated-ON path with a fake opener.
+    monkeypatch.setenv('VIGILENS_LIVE_DISPATCH', 'on')
     approvals = tmp_path / 'approvals.json'
     from fresh_review.demo_approvals import SeamlessDemoApprovalStore
     store = SeamlessDemoApprovalStore(approvals, hashlib.sha256(approvals.read_bytes()).hexdigest(),

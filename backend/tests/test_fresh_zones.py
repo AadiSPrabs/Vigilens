@@ -37,7 +37,7 @@ def test_real_factory_zone_review_contact_report_and_expiry(material):
  assert len(calls)==2
  c.app.state.fresh_display.SESSIONS.clear()
  assert c.get('/fresh-review/'+frame.digest+'/zone-review').status_code==409
- prepare(c,raw,frame)
+ x2=prepare(c,raw,frame);acknowledge(c,x2)
  assert c.get('/fresh-review/'+frame.digest+'/zone-review').json()['zone_snapshot']['event_id']==first
 @pytest.mark.parametrize('field,value',[('source_digest','0'*64),('result_sha256','0'*64),('zones',[{**ZONE,'hazard':1}]),('reviewer_label','')])
 def test_zone_invalid_bindings(material,field,value):
@@ -47,7 +47,7 @@ def test_zone_invalid_bindings(material,field,value):
  assert len(calls)==2
 
 def test_zone_owner_and_tamper(material):
- p,raw,frame,calls,c,job=material;prepare(c,raw,frame);assert submit(c,frame,job).status_code==200
+ p,raw,frame,calls,c,job=material;x=prepare(c,raw,frame);acknowledge(c,x);assert submit(c,frame,job).status_code==200
  assert c.get('/fresh-review/'+frame.digest+'/zone-review',headers={'X-Vigilens-Display-Session':'34'*32}).status_code==409
  db=sqlite3.connect(p.path);db.execute("UPDATE zone_events SET zones_sha='wrong'");db.commit();db.close()
  assert c.get('/fresh-review/'+frame.digest+'/zone-review').status_code==409
@@ -56,11 +56,11 @@ def test_zone_restart_clear_history_and_capacity(material):
  from fastapi.testclient import TestClient
  from fresh_review.zones import MAX_EVENTS
  from app import create_app
- p,raw,frame,calls,c,job=material;prepare(c,raw,frame)
+ p,raw,frame,calls,c,job=material;x=prepare(c,raw,frame);acknowledge(c,x)
  initial=submit(c,frame,job).json()['zone_snapshot']
  restarted=TestClient(create_app(fresh_service=p),headers={'X-Vigilens-Display-Session':OWNER})
  assert restarted.get('/fresh-review/'+frame.digest+'/zone-review').status_code==409
- prepare(restarted,raw,frame)
+ xr=prepare(restarted,raw,frame);acknowledge(restarted,xr)
  assert restarted.get('/fresh-review/'+frame.digest+'/zone-review').json()['zone_snapshot']==initial
  cleared=submit(restarted,frame,job,[]).json()
  assert cleared['persons'][0]['status']=='not_configured'and cleared['zone_snapshot']['event_id']!=initial['event_id']

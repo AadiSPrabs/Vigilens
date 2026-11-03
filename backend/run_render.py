@@ -30,7 +30,14 @@ Environment:
   VIGILENS_LIVE_DISPATCH      'on' permits real provider calls in meta mode. OFF by default;
                               owner-approved, paid, and never set by this package.
   VIGILENS_CAP                Install cap in USD string (default '5').
+  VIGILENS_CLIP_LIMITS_JSON   Optional bounded local clip decoding. JSON object with the
+                              six ClipLimits fields (max_bytes, max_seconds, max_frames,
+                              max_side, max_pixels, subprocess_seconds). Unset keeps the
+                              clip route fail-closed (409). Limits bound the local decoder
+                              only; they never install source approvals and enable no
+                              provider dispatch. Invalid values refuse the boot.
 """
+import json
 import os
 import secrets
 import sys
@@ -49,6 +56,93 @@ def _private_write(path: Path, raw: bytes) -> None:
         os.fsync(fd)
     finally:
         os.close(fd)
+
+
+def _wire_face_proposals(service):
+    # Optional offline face-check review aid: enabled only when the operator
+    # provisions the pinned YuNet model file and sets its absolute path. Unset
+    # means the proposals endpoint stays unavailable (409) and the operator's
+    # manual whole-frame review remains the requirement. The model sha256 pin
+    # lives in fresh_review/face_proposals.py; a mismatched file fails closed.
+    # The aid never creates regions, never applies treatment, and never spends.
+    face_model = os.environ.get('VIGILENS_FACE_MODEL_PATH', '').strip()
+    if face_model:
+        service.face_proposal_model_path = face_model
+
+
+def _wire_clip_limits(service):
+    # Optional bounded local clip decoding, mirroring _wire_face_proposals: enabled
+    # only when the operator sets VIGILENS_CLIP_LIMITS_JSON (see module docstring).
+    # Unset means the clip route stays unavailable (409) and /health keeps reporting
+    # trusted_clip_decode_configured=false. The limits bound the local decoder only;
+    # the route itself never installs source approvals - every sampled frame still
+    # requires its own pre-existing approval. Invalid config refuses the boot loudly
+    # rather than silently degrading an operator's explicit intent.
+    raw = os.environ.get('VIGILENS_CLIP_LIMITS_JSON', '').strip()
+    if not raw:
+        return
+    from fresh_review.clips import ClipLimits
+    try:
+        values = json.loads(raw)
+        if not isinstance(values, dict):
+            raise TypeError('JSON object with the six ClipLimits fields required')
+        limits = ClipLimits(**values)
+        limits.validate()
+    except (ValueError, TypeError, KeyError) as e:
+        raise SystemExit('VIGILENS_CLIP_LIMITS_JSON is set but invalid; refusing to boot: ' + str(e))
+    # Host binary gate: the decoder needs all three on PATH. DECIDED fail-closed
+    # behavior: a configured-but-undecodable limits config refuses the WHOLE boot
+    # here (SystemExit), not just the clip route. This is a deliberate impact
+    # change from the unconfigured case (route-only 409, health reports
+    # trusted_clip_decode_configured=false): an operator who set the limits asked
+    # for decoding; serving a half-configured service whose health endpoint
+    # reports configured=true while every clip request fails closed would hide a
+    # provisioning defect behind a healthy-looking boot. Operators who want the
+    # route-only behavior unset VIGILENS_CLIP_LIMITS_JSON. The same SystemExit
+    # applies to invalid JSON above.
+    import shutil
+    missing = [b for b in ('ffmpeg', 'ffprobe', 'prlimit') if shutil.which(b) is None]
+    if missing:
+        raise SystemExit('VIGILENS_CLIP_LIMITS_JSON requires host binaries on PATH, missing: '
+                         + ', '.join(missing) + '; refusing to boot')
+    service.trusted_clip_limits = limits
+
+def _seed_approvals_ephemeral(config_path, env):
+    """E2 hosted path, ephemeral/file state: merge the operator-pinned approvals
+    document (env) into the install approvals file INSERT-only, then re-pin the
+    config. Unset env leaves the install untouched. Any divergence or pin
+    mismatch refuses the boot (see fresh_review/approvals_seed.py).
+
+    The whole read-merge-write runs under the SAME cross-process lock the
+    seamless recorder and the CLI approve tool take (a concurrent upload
+    recording can never be silently lost to this write), both files are written
+    atomically (temp + fsync + replace, never O_TRUNC), the seamless sidecar is
+    advanced when the install is seamless (so a peer server re-syncs instead of
+    failing closed on tamper suspicion), and the paired state is verified
+    before serving: file sha, config pin and sidecar must all agree."""
+    from fresh_review.approvals_seed import env_pinned_document, merge_insert_only, EMPTY_DOC
+    seed = env_pinned_document(env)
+    if seed is None:
+        return
+    import hashlib
+    from dev_install import _atomic_private_write
+    from fresh_review.demo_approvals import _cross_process_lock
+    config = json.loads(config_path.read_bytes())
+    approvals_path = Path(config['approval_path'])
+    seamless = config.get('seamless_upload_approval') is True
+    sidecar = approvals_path.with_name('approvals.recorded-sha256')
+    with _cross_process_lock(approvals_path):
+        existing = approvals_path.read_bytes() if approvals_path.is_file() else EMPTY_DOC
+        raw, sha, _inserted = merge_insert_only(existing, seed)
+        _atomic_private_write(approvals_path, raw)
+        config['approval_sha256'] = sha
+        _atomic_private_write(config_path, (json.dumps(config, indent=2, sort_keys=True) + '\n').encode())
+        if seamless:
+            _atomic_private_write(sidecar, (sha + '\n').encode())
+        if hashlib.sha256(approvals_path.read_bytes()).hexdigest() != sha \
+                or json.loads(config_path.read_bytes()).get('approval_sha256') != sha \
+                or (seamless and sidecar.read_text().strip() != sha):
+            raise SystemExit('approvals seed paired-state verification failed; refusing to boot')
 
 
 def main() -> None:
@@ -82,6 +176,8 @@ def main() -> None:
         scope = 'private_provider_processing' if transport_mode == 'meta' else 'synthetic_local_qualification'
         service = boot_pg_service(dsn, cap=os.environ.get('VIGILENS_CAP', '5'), scope=scope,
                                   seamless=True, transport=SyntheticTransport())
+        _wire_face_proposals(service)
+        _wire_clip_limits(service)
         token = env_token or secrets.token_urlsafe(36)  # fail-closed random gate when unset
         origins = origins or ['http://localhost:5173']
         if transport_mode == 'meta':
@@ -93,7 +189,10 @@ def main() -> None:
         print('Vigilens Render trial server (durable Postgres state; governed routes and cap accounting unchanged).', flush=True)
         uvicorn.run(app, host='0.0.0.0', port=port, access_log=False)
         return
+    _seed_approvals_ephemeral(config_path, os.environ)
     service, token, _loopback_only = load_service(config_path)
+    _wire_face_proposals(service)
+    _wire_clip_limits(service)
     if transport_mode == 'meta':
         # BYOK shape: live-capable transport whose key arrives per request (visitor's own
         # key, request-scoped contextvar, never stored). Actual network dispatch remains

@@ -1,0 +1,268 @@
+{
+  "source": "private_report_preview_not_released",
+  "assessment_source": "fresh_upload_provider_review",
+  "current_assessment_binding": null,
+  "ppe_summary_status": "preserved_provider_observations",
+  "ppe_basis_counts": {
+    "detected_count": 1,
+    "provider_observation_attempted_count": 1,
+    "outcome_emitted_count": 0,
+    "legacy_outcome_withheld_count": 0,
+    "outcome_emitted_clean_rule_count": 0,
+    "legacy_basis_not_recorded_count": 0,
+    "attribution_unresolved_partial_count": 1,
+    "attempted_clean_rule_both_items_unknown_count": 0,
+    "resolved_item_count": 0,
+    "fully_resolved_person_count": 0,
+    "legacy_field_semantics": "PPE_assessed_count, all_detected_people_assessed and ppe_assessed (older names, kept unchanged for compatibility) mean provider observation attempted, not a resolved assessment",
+    "target_level_outcome_permitted_count": 0,
+    "attempted_is_not_resolved_assessment": true,
+    "emitted_is_not_resolved": true,
+    "counts_are_not_the_10_plus_qualification": true,
+    "resolved_means": "both helmet and vest known (present or absent) on a clean_crop proven by the stored eligibility record; still an unvalidated provider reading, not safe or compliant"
+  },
+  "ppe_stage": null,
+  "sam_configuration": null,
+  "sam_configuration_sha256": null,
+  "manual_contact_review": {},
+  "automatic_contact": false,
+  "compliance_decision": false,
+  "assessment_id": "fresh:1f7735c06f6c8f79bea5e90ffd95e389fda6b5921af8516f2dd66dcd06d2afa0:694b76f477007d5589a54c3d547038bb2537f84a8c33766acb4322decf4b0888",
+  "source_digest": "1f7735c06f6c8f79bea5e90ffd95e389fda6b5921af8516f2dd66dcd06d2afa0",
+  "derivative_sha256": "3f511f3df589ac99826c45bcbfde4a2b852e366c414227a14cdc71cfd5a38179",
+  "regions_digest": "c9a140bcbecc184c48686fb36ee8f7cf59e048f2541b73a7b42838b572066a82",
+  "persons": [
+    {
+      "person_id": "0",
+      "provider_helmet_observation": "unknown",
+      "ppe_basis": {
+        "crop_basis": "crop_rule_ineligible",
+        "crop_rule_reasons": [
+          "crop_too_small_for_configured_evidence_threshold"
+        ],
+        "items": {
+          "helmet": {
+            "provider_observation": "unknown",
+            "resolved_state": "unknown",
+            "target_attribution": "unresolved_partial_evidence",
+            "target_level_outcome_permitted": false,
+            "item_resolved": false
+          },
+          "vest": {
+            "provider_observation": "absent",
+            "resolved_state": "absent_attribution_unresolved",
+            "target_attribution": "unresolved_partial_evidence",
+            "target_level_outcome_permitted": false,
+            "item_resolved": false
+          }
+        }
+      },
+      "ppe_assessed": true,
+      "geometry_status": "mask_verified",
+      "ppe_evidence_status": "provider_observed",
+      "crop_eligibility": {
+        "eligible_for_selected_crop_call": false,
+        "review_reasons": [
+          "crop_too_small_for_configured_evidence_threshold"
+        ],
+        "identity_or_visibility_validated": false,
+        "recorded_by": "single_upload_same_eligibility_function",
+        "limits_applied": {
+          "min_crop_width": 32,
+          "min_crop_height": 64,
+          "source": "WideLimits defaults; technical threshold, not accuracy validation"
+        }
+      },
+      "report_display_helmet": "unknown",
+      "provider_vest_observation": "absent",
+      "report_display_vest": "unknown",
+      "vest_evidence_review": {
+        "torso_evidence_visible": true,
+        "display_finding_allowed": false,
+        "basis": "operator_evidence_claim_only"
+      },
+      "evidence_review": {
+        "source": "offline_operator_evidence_review",
+        "source_digest": "1f7735c06f6c8f79bea5e90ffd95e389fda6b5921af8516f2dd66dcd06d2afa0",
+        "derivative_sha256": "3f511f3df589ac99826c45bcbfde4a2b852e366c414227a14cdc71cfd5a38179",
+        "regions_digest": "c9a140bcbecc184c48686fb36ee8f7cf59e048f2541b73a7b42838b572066a82",
+        "person_id": "0",
+        "input_helmet_observation": "unknown",
+        "display_finding_allowed": false,
+        "evidence_status": "needs_human_review",
+        "derived_helmet_verdict": null,
+        "automatic_privacy_clearance": false,
+        "privacy_review_status": "not_validated",
+        "evidence_export_allowed": false,
+        "notice": "Operator evidence sufficiency only, not model verification, anonymity or release approval."
+      },
+      "status": "needs_human_review"
+    }
+  ],
+  "wide_scene": null,
+  "status": "needs_human_review",
+  "whole_frame_operator_review": {
+    "checked": true,
+    "basis": "operator_claim_only_not_detector_coverage",
+    "ack": {
+      "source_digest": "1f7735c06f6c8f79bea5e90ffd95e389fda6b5921af8516f2dd66dcd06d2afa0",
+      "output_sha256": "3f511f3df589ac99826c45bcbfde4a2b852e366c414227a14cdc71cfd5a38179",
+      "regions_digest": "c9a140bcbecc184c48686fb36ee8f7cf59e048f2541b73a7b42838b572066a82",
+      "frame_size": [
+        80,
+        80
+      ],
+      "foreground_checked": true,
+      "background_checked": true,
+      "reflections_checked": true,
+      "derivative_checked": true
+    }
+  },
+  "face_covering_review": [],
+  "face_covering_assurance": "operator_visual_claim_not_privacy_validation",
+  "privacy_review_status": "not_validated",
+  "evidence_export_allowed": false,
+  "notice": "Faces-in-reports requirement still needs reliable coverage/release validation. This private preview is not safe-to-share evidence.",
+  "contact_review_status": "needs_manual_contact_review",
+  "zone_review": {
+    "contract_version": "vigilens.zone-review.proposal.v1",
+    "source_digest": "1f7735c06f6c8f79bea5e90ffd95e389fda6b5921af8516f2dd66dcd06d2afa0",
+    "result_sha256": "694b76f477007d5589a54c3d547038bb2537f84a8c33766acb4322decf4b0888",
+    "zone_snapshot": {
+      "event_id": 2,
+      "zones": [
+        {
+          "id": "yard",
+          "name": "Yard",
+          "hazard": true,
+          "points": [
+            {
+              "x": 0.05,
+              "y": 0.2
+            },
+            {
+              "x": 0.4,
+              "y": 0.2
+            },
+            {
+              "x": 0.4,
+              "y": 0.9
+            },
+            {
+              "x": 0.05,
+              "y": 0.9
+            }
+          ]
+        }
+      ],
+      "zones_sha256": "5d4b40933b586ff302abedb30041dc7e0cb9e7637c00aeafdfee252bf31d005c",
+      "reviewer_label": "synthetic operator",
+      "at": 1793642707.4004917
+    },
+    "persons": [
+      {
+        "person_id": "0",
+        "zone_ids": null,
+        "display_zone_id": null,
+        "status": "needs_manual_contact_review",
+        "basis": "operator_zones_and_current_manual_contact_not_automatic",
+        "safety_decision": false
+      }
+    ],
+    "policy_status": "not_applied",
+    "compliance_status": "not_evaluated",
+    "automatic_contact": false,
+    "privacy_review_status": "not_validated",
+    "evidence_export_allowed": false,
+    "provider_calls_this_request": 0
+  },
+  "configured_rule_review": {
+    "status": "not_configured",
+    "findings": null,
+    "evidence_export_allowed": false
+  },
+  "ppe_segmentation": {
+    "status": "not_configured",
+    "batches": []
+  },
+  "ppe_cross_stage_review": {
+    "status": "cross_stage_signals_not_ppe_verdict",
+    "signals": [],
+    "automatic_dispatch": false,
+    "original_observations_unchanged": true
+  },
+  "deliberate_rechecks": {
+    "status": "separate_candidates_require_review",
+    "attempts": [
+      {
+        "attempt_id": "935e62c002b7562e4b73bd7627f93e6b1d40ea7d25833c8ac1bea63c5e85812a",
+        "state": "completed",
+        "result": {
+          "candidate_observations": {
+            "helmet": "unknown",
+            "vest": "absent"
+          },
+          "candidate_response": {
+            "accuracy_status": "not_validated",
+            "actual_debit": "unchecked",
+            "evidence_export_allowed": false,
+            "listed_cost_usd": "0.000465",
+            "model": "muse-spark-1.3",
+            "observation": {
+              "helmet": "unknown",
+              "helmet_evidence": "synthetic head evidence",
+              "vest": "absent",
+              "vest_evidence": "synthetic torso evidence"
+            },
+            "provider_revision": "not_returned",
+            "response_id": "synthetic-response",
+            "response_sha256": "996434821ae4398cabe17a349336b432ecd0e8f72deaeebc842cfb9896384771",
+            "usage": {
+              "input_tokens": 100,
+              "output_tokens": 80
+            }
+          },
+          "contradictions": [],
+          "crop_person_association": {
+            "basis": "single_crop_mask_centre_and_original_foreground_overlap_not_identity_proof",
+            "intersection_pixels": 1200,
+            "minimum_iou": 0.5,
+            "union_pixels": 1200
+          },
+          "evidence_export_allowed": false,
+          "original_observations": {
+            "helmet": "unknown",
+            "vest": "absent"
+          },
+          "original_overwrite_allowed": false,
+          "person_id": "0",
+          "result_sha256": "694b76f477007d5589a54c3d547038bb2537f84a8c33766acb4322decf4b0888",
+          "review_display_proposal": {
+            "helmet": "unknown",
+            "vest": "absent"
+          },
+          "source_digest": "1f7735c06f6c8f79bea5e90ffd95e389fda6b5921af8516f2dd66dcd06d2afa0",
+          "status": "needs_human_review"
+        },
+        "retry_allowed": false,
+        "provider_calls_this_request": 0,
+        "evidence_export_allowed": false,
+        "binding": {
+          "source_digest": "1f7735c06f6c8f79bea5e90ffd95e389fda6b5921af8516f2dd66dcd06d2afa0",
+          "result_sha256": "694b76f477007d5589a54c3d547038bb2537f84a8c33766acb4322decf4b0888",
+          "person_id": "0",
+          "attempt": 1,
+          "crop_png_sha256": "b487103407bb8a4fcfc0b19cbff9c4ef24463f2b421c7b1158f9deb2ecb4d02d"
+        },
+        "original_result_unchanged": true,
+        "candidate_adoption": "requires_separate_human_review"
+      }
+    ],
+    "original_result_unchanged": true,
+    "automatic_candidate_adoption": false
+  },
+  "spatial_explanations": {
+    "status": "not_configured",
+    "attempts": []
+  }
+}

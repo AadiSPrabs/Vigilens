@@ -15,6 +15,7 @@ sslmode, and the driver policy enforces the result.
 """
 import hashlib
 import json
+import os
 import sqlite3
 
 from dev_install import carry_doc
@@ -73,6 +74,53 @@ def _seed_document(dsn, name, raw):
         c.close()
 
 
+def _seed_approvals_document(dsn, seed_raw):
+    """E2 hosted path, durable state: merge the seed document into the durable
+    approvals document at ENTRY level (insert-only; identical entries kept;
+    a differing existing entry refuses the boot via merge_insert_only). With an
+    empty seed this degrades to the old adoption behavior: the existing durable
+    document wins unchanged.
+
+    Fencing: the read-merge-write runs inside the install fencing transaction
+    (BEGIN IMMEDIATE + SELECT ... FOR UPDATE, the same pattern
+    PinnedPGDocument.record uses; on Postgres this is a transaction-scoped
+    advisory lock). Concurrent boots serialize, so no concurrent seed is lost
+    and each boot's returned pin is exactly its own committed row. A boot that
+    commits before a peer's merge then fails closed on pin verification and
+    adopts the peer's committed row on refresh - complete by construction."""
+    from fresh_review.approvals_seed import EMPTY_DOC, merge_insert_only
+    from fresh_review.db import is_pg_dsn
+    # BEGIN IMMEDIATE serializes writers on BOTH backends (sqlite file write
+    # lock; PG transaction-scoped advisory lock). FOR UPDATE adds the row lock
+    # on PG only - raw sqlite connections take no SQL translation and reject it.
+    select = ('SELECT raw FROM documents WHERE name=? FOR UPDATE' if is_pg_dsn(dsn)
+              else 'SELECT raw FROM documents WHERE name=?')
+    c = open_store(dsn)
+    try:
+        create_documents(c)
+        c.execute('BEGIN IMMEDIATE')
+        try:
+            row = c.execute(select, (APPROVALS_DOC,)).fetchone()
+            if row is None:
+                raw, sha, _inserted = merge_insert_only(EMPTY_DOC, seed_raw)
+                c.execute('INSERT INTO documents VALUES(?,?)', (APPROVALS_DOC, raw))
+            else:
+                existing = bytes(row[0])
+                raw, sha, inserted = merge_insert_only(existing, seed_raw)
+                if inserted:
+                    c.execute('UPDATE documents SET raw=? WHERE name=?', (raw, APPROVALS_DOC))
+            c.commit()
+            return raw, sha
+        except BaseException:
+            try:
+                c.rollback()
+            except Exception:
+                pass
+            raise
+    finally:
+        c.close()
+
+
 def boot_pg_service(dsn, *, cap, scope, seamless, transport):
     """Build the governed FreshPipeline fully backed by Postgres. Same service
     shape dev_install.load_service returns, with durable state. No provider
@@ -83,8 +131,8 @@ def boot_pg_service(dsn, *, cap, scope, seamless, transport):
         raise ValueError('Exact processing scope required')
     carry_raw = (json.dumps(carry_doc(cap), sort_keys=True) + '\n').encode()
     carry_sha = _seed_document(dsn, CARRY_DOC, carry_raw)
-    approvals_raw = (json.dumps({'version': 1, 'approvals': {}}, sort_keys=True) + '\n').encode()
-    approvals_sha = _seed_document(dsn, APPROVALS_DOC, approvals_raw)
+    from fresh_review.approvals_seed import EMPTY_DOC, env_pinned_document
+    approvals_raw, approvals_sha = _seed_approvals_document(dsn, env_pinned_document(os.environ) or EMPTY_DOC)
     if seamless:
         store = SeamlessDemoApprovalStore.pg(dsn, APPROVALS_DOC, approvals_sha, scope=scope)
     else:

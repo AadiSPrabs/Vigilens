@@ -51,19 +51,27 @@ export function PrintReport({
 
       <section className="mt-4 flex flex-col gap-2">
         <h2 className="text-lg font-semibold text-vg-text">Image</h2>
-        <ImageStage
-          imageUrl={imageUrl}
-          imageAlt="Preview of the audited photo with zone and person overlays"
-          zones={audit.zones.length ? audit.zones : zones}
-          persons={audit.persons}
-          selectedPersonId={null}
-          readOnly
-          caption={
-            <span>
-              Preview only, not evidence. Masked evidence unavailable.
-            </span>
-          }
-        />
+        {audit.source === "backend" ? (
+          <div className="rounded border border-vg-border px-3 py-2 text-sm text-vg-text-secondary">
+            Original image withheld from print output: browser print is not masked
+            and reports may be distributed. Use the acknowledged private PDF
+            preview for masked report output.
+          </div>
+        ) : (
+          <ImageStage
+            imageUrl={imageUrl}
+            imageAlt="Preview of the audited photo with zone and person overlays"
+            zones={audit.zones.length ? audit.zones : zones}
+            persons={audit.persons}
+            selectedPersonId={null}
+            readOnly
+            caption={
+              <span>
+                Preview only, not evidence. Masked evidence unavailable.
+              </span>
+            }
+          />
+        )}
       </section>
 
       <section className="mt-4 flex flex-col gap-2">

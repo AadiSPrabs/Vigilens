@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { ImageStage } from "@/vigilens/components/ImageStage";
+import { RechecksPanel } from "@/vigilens/components/RechecksPanel";
+import { PreviewCeremony } from "@/vigilens/components/PreviewCeremony";
+import { PrivateReportPanel } from "@/vigilens/components/PrivateReportPanel";
+import { ZoneReviewPanel } from "@/vigilens/components/ZoneReviewPanel";
+import { ClipPanel } from "@/vigilens/components/ClipPanel";
+import { executeRecheck } from "@/vigilens/api/backendClient";
+import type { PrivateDisplaySession, RecheckAttempt } from "@/vigilens/types";
 import { Inspector } from "@/vigilens/components/Inspector";
 import { PrintReport } from "@/vigilens/components/PrintReport";
 import { BannerStack } from "@/vigilens/components/BannerStack";
@@ -88,8 +95,36 @@ export default function VigilensRoute() {
 
   const pickFile = (file: File) => {
     setDraft(null);
+    setPreviewSession(null);
     vg.chooseUpload(file);
   };
+
+  const [previewSession, setPreviewSession] = useState<PrivateDisplaySession | null>(null);
+  const [recheckBusy, setRecheckBusy] = useState<string | null>(null);
+  const [recheckError, setRecheckError] = useState<string | null>(null);
+  const runRecheck = (attempt: RecheckAttempt) => {
+    // Explicit per-attempt click only; the client never retries. After execution the
+    // audit is re-presented from the stored result (analyse is stored-only on this
+    // backend), so the original readings stay exactly as they were.
+    setRecheckError(null);
+    setRecheckBusy(attempt.attempt_id);
+    executeRecheck(attempt.binding.source_digest, attempt.attempt_id, attempt.binding)
+      .then(() => {
+        announce("Recheck finished. Refreshing the stored audit; original readings unchanged.");
+        vg.analyse();
+      })
+      .catch((err: unknown) => {
+        setRecheckError(err instanceof Error && err.message ? err.message : "Recheck refused. No automatic retry.");
+        // Any execute refusal (expired/discarded preview included) clears the
+        // readiness marker so the panel never shows enabled-but-doomed Execute.
+        setPreviewSession(null);
+      })
+      .finally(() => setRecheckBusy(null));
+  };
+
+  const previewFile = source?.kind === "upload" ? source.file : null;
+  const previewRequired = !!audit && audit.source === "backend" && !!audit.image.pixel_digest && !!audit.rechecks && previewFile !== null;
+  const previewReady = !!previewSession && !!audit?.image.pixel_digest && previewSession.source_digest === audit.image.pixel_digest;
 
   const startDraft = () => setDraft({ points: [], name: "", hazard: false, error: null });
 
@@ -211,6 +246,33 @@ export default function VigilensRoute() {
               onCancel={vg.cancel}
               onRetry={vg.analyse}
             />
+            {previewRequired && previewFile && audit ? (
+              <PreviewCeremony
+                audit={audit}
+                file={previewFile}
+                onAcknowledged={(session) => {
+                  setPreviewSession(session);
+                  announce("Preview acknowledged. Any available recheck will use this treated copy only.");
+                }}
+                onInvalidate={() => setPreviewSession(null)}
+              />
+            ) : null}
+            {previewReady && previewSession && audit ? (
+              <PrivateReportPanel audit={audit} session={previewSession} />
+            ) : null}
+            {audit && audit.source === "backend" ? (
+              <ZoneReviewPanel audit={audit} zones={zones} previewReady={previewReady} />
+            ) : null}
+            {audit?.rechecks ? (
+              <RechecksPanel
+                rechecks={audit.rechecks}
+                onExecute={runRecheck}
+                executeBlockedReason={previewRequired && !previewReady ? "Prepare and acknowledge a treated preview before any recheck." : null}
+                busyAttemptId={recheckBusy}
+                executeError={recheckError}
+              />
+            ) : null}
+            <ClipPanel />
           </aside>
         </div>
       </div>

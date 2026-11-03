@@ -204,3 +204,299 @@ describe("auditClient routing", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 });
+
+describe("executeRecheck", () => {
+  const SRC = "a".repeat(64);
+  const ATTEMPT = "b".repeat(64);
+  const BINDING = { source_digest: SRC, result_sha256: "c".repeat(64) };
+
+  it("posts the exact binding to the per-attempt proxy route and returns the view", async () => {
+    const view = {
+      attempt_id: ATTEMPT, state: "completed", retry_allowed: false,
+      provider_calls_this_request: 2, evidence_export_allowed: false,
+      result: { helmet: "present", vest: "unknown" },
+      binding: { ...BINDING, person_id: "0", attempt: 0, crop_png_sha256: "d".repeat(64) },
+      original_result_unchanged: true, candidate_adoption: "requires_separate_human_review",
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, view));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = await importClient({});
+    const out = await client.executeRecheck(SRC, ATTEMPT, BINDING);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const call = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(call[0]).toBe(`/api/vigilens/fresh-review/${SRC}/recheck/${ATTEMPT}`);
+    expect(call[1].method).toBe("POST");
+    expect(JSON.parse(call[1].body as string)).toEqual(BINDING);
+    expect(out.state).toBe("completed");
+  });
+
+  it("surfaces the backend's exact 409 refusal, never retries", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(409, { detail: "Explicit recheck unavailable; no new reservation, grant or automatic retry" }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const client = await importClient({});
+    await expect(client.executeRecheck(SRC, ATTEMPT, BINDING)).rejects.toThrow(
+      /Explicit recheck unavailable.*No automatic retry/,
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("maps 503 to execution-disabled without retry", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(503, { detail: "Recheck execution disabled" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = await importClient({});
+    await expect(client.executeRecheck(SRC, ATTEMPT, BINDING)).rejects.toThrow(/disabled.*503/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a non-JSON success response", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("ok", { status: 200, headers: { "content-type": "text/plain" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = await importClient({});
+    await expect(client.executeRecheck(SRC, ATTEMPT, BINDING)).rejects.toThrow(/Invalid response format/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("uploadClip", () => {
+  function clipSummary() {
+    return {
+      source_clip_sha256: "e".repeat(64), duration_seconds: 4.0,
+      requested_sample_count: 2, completed_sample_count: 2,
+      frames: [{
+        sample_index: 0, requested_offset_seconds: 1.0, timestamp_basis: "container",
+        source_clip_sha256: "e".repeat(64), pixel_digest: "f".repeat(64), width: 640, height: 360,
+        image_job: { state: "completed", result: { persons: [] } },
+        provider_calls_this_sample: 2, repeated_pixels_share_image_job: false,
+      }],
+      provider_calls_this_request: 2, status: "completed",
+      frames_with_unassessed_people: [], frames_with_unresolved_people: [],
+      attempted_is_not_resolved_assessment: true,
+      completed_state_is_execution_terminal_not_assessment_complete: true,
+      cross_frame_person_identity: "not_inferred",
+      sampled_frames_are_not_complete_clip_coverage: true,
+      clip_intrusion_or_crossing: "not_inferred_from_sampled_presence",
+      privacy_review_status: "not_validated", evidence_export_allowed: false,
+      automatic_retry_allowed: false,
+      report_integration: "per_frame_private_image_review_required",
+      decoder_scope: "local_trusted_clip_only_not_public_upload_service",
+      private_clip_review_id: "review-1",
+    };
+  }
+
+  it("posts clip + offsets as multipart and returns the summary", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, clipSummary()));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = await importClient({});
+    const file = new File([new Uint8Array([1, 2, 3])], "sample.mp4", { type: "video/mp4" });
+    const out = await client.uploadClip(file, [0.5, 2.0]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const call = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(call[0]).toBe("/api/vigilens/fresh-review-clip-upload");
+    expect(call[1].method).toBe("POST");
+    const body = call[1].body as FormData;
+    expect(body.get("offsets")).toBe("[0.5,2]");
+    expect((body.get("clip") as File).name).toBe("sample.mp4");
+    expect(out.status).toBe("completed");
+    expect(out.sampled_frames_are_not_complete_clip_coverage).toBe(true);
+  });
+
+  it("surfaces the backend's not-configured 409 verbatim, never retries", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(409, { detail: "Trusted clip preparation/source approval unavailable; no automatic retry" }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const client = await importClient({});
+    const file = new File([new Uint8Array([1])], "c.mp4", { type: "video/mp4" });
+    await expect(client.uploadClip(file, [1])).rejects.toThrow(/Trusted clip preparation.*No automatic retry/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("maps 503 to execution-disabled without retry", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(503, { detail: "Clip provider execution disabled" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = await importClient({});
+    const file = new File([new Uint8Array([1])], "c.mp4", { type: "video/mp4" });
+    await expect(client.uploadClip(file, [1])).rejects.toThrow(/disabled.*503/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a non-JSON success response", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("ok", { status: 200, headers: { "content-type": "text/plain" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = await importClient({});
+    const file = new File([new Uint8Array([1])], "c.mp4", { type: "video/mp4" });
+    await expect(client.uploadClip(file, [1])).rejects.toThrow(/Invalid response format/);
+  });
+});
+
+describe("private-display ceremony client", () => {
+  const SOURCE = "a".repeat(64);
+  function sessionBody() {
+    return {
+      session_id: "sess-token-abcdef-123456",
+      source_digest: SOURCE,
+      output_sha256: "b".repeat(64),
+      regions_digest: "c".repeat(64),
+      width: 1280, height: 720,
+      preview_url: "/private-display/sess-token-abcdef-123456/image",
+      warning: "Blur may retain identity.",
+      evidence_export_allowed: false,
+    };
+  }
+
+  it("posts image + review JSON as multipart to the exact source route", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, sessionBody()));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = await importClient({});
+    const file = new File([new Uint8Array([9, 9])], "scene.png", { type: "image/png" });
+    const review = { source_digest: SOURCE, frame_size: [1280, 720], regions: [], reviewer_label: "visitor preview preparation", redaction_method: "opaque" };
+    const out = await client.preparePrivateDisplay(SOURCE, file, review);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const call = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(call[0]).toBe(`/api/vigilens/fresh-review/${SOURCE}/private-display`);
+    expect(call[1].method).toBe("POST");
+    const body = call[1].body as FormData;
+    expect((body.get("image") as File).name).toBe("scene.png");
+    expect(JSON.parse(body.get("review") as string).redaction_method).toBe("opaque");
+    expect(out.session_id).toBe("sess-token-abcdef-123456");
+    expect(out.evidence_export_allowed).toBe(false);
+  });
+
+  it("surfaces a 409 binding refusal verbatim and never retries", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(409, { detail: "Fresh preview binding unavailable or changed" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = await importClient({});
+    const file = new File([new Uint8Array([1])], "scene.png", { type: "image/png" });
+    await expect(client.preparePrivateDisplay(SOURCE, file, {})).rejects.toThrow(/binding unavailable or changed.*409.*No automatic retry/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  const ALL_CHECKED = { foreground_checked: true, background_checked: true, reflections_checked: true, derivative_checked: true };
+
+  it("acknowledges with the exact derivative fields and all four visual checks", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { status: "acknowledged" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = await importClient({});
+    await client.acknowledgePrivateDisplay(sessionBody() as never, ALL_CHECKED);
+    const call = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(call[0]).toBe("/api/vigilens/private-display/sess-token-abcdef-123456/review");
+    const body = JSON.parse(call[1].body as string);
+    expect(body).toEqual({
+      source_digest: SOURCE,
+      output_sha256: "b".repeat(64),
+      regions_digest: "c".repeat(64),
+      frame_size: [1280, 720],
+      foreground_checked: true,
+      background_checked: true,
+      reflections_checked: true,
+      derivative_checked: true,
+    });
+  });
+
+  it("surfaces an acknowledgment mismatch refusal verbatim and never retries", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(409, { detail: "Review must match this exact derivative" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = await importClient({});
+    await expect(client.acknowledgePrivateDisplay(sessionBody() as never, ALL_CHECKED)).rejects.toThrow(/exact derivative.*409/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("serializes the actual checkbox map, including a false value", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(409, { detail: "Review must match this exact derivative" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = await importClient({});
+    await expect(
+      client.acknowledgePrivateDisplay(sessionBody() as never, { ...ALL_CHECKED, reflections_checked: false }),
+    ).rejects.toThrow(/409/);
+    const call = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(call[1].body as string).reflections_checked).toBe(false);
+  });
+
+  it("rejects a malformed prepare response instead of trusting it", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { session_id: "x", source_digest: "not-hex" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = await importClient({});
+    const file = new File([new Uint8Array([1])], "scene.png", { type: "image/png" });
+    await expect(client.preparePrivateDisplay(SOURCE, file, {})).rejects.toThrow(/Invalid response format/);
+  });
+
+  it("builds the treated preview image URL from the session id", async () => {
+    const client = await importClient({});
+    expect(client.privateDisplayImageUrl("sess token")).toBe("/api/vigilens/private-display/sess%20token/image");
+  });
+});
+
+describe("face-proposals review-aid client", () => {
+  const SOURCE = "a".repeat(64);
+  function proposalsBody() {
+    return {
+      source_pixel_digest: SOURCE,
+      frame: [1280, 720],
+      detector: "YuNet2023mar",
+      threshold: 0.6,
+      proposals: [
+        { box: [10, 10, 40, 50], review_region: [7, 3, 43, 58], confidence: 0.91, pass_scale: 1, helmet_overlap_unchecked: true },
+      ],
+      status: "needs_manual_review",
+      coverage: "unverified",
+      zero_detections_means_safe: false,
+      privacy_review_status: "not_validated",
+      reason: "proposals_require_face_and_helmet_review",
+      automatic_treatment_applied: false,
+      provider_calls_this_request: 0,
+    };
+  }
+
+  it("posts the exact original image to the source route and returns labeled proposals", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, proposalsBody()));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = await importClient({});
+    const file = new File([new Uint8Array([9, 9])], "scene.png", { type: "image/png" });
+    const out = await client.fetchFaceProposals(SOURCE, file);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const call = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(call[0]).toBe(`/api/vigilens/fresh-review/${SOURCE}/face-proposals`);
+    expect(call[1].method).toBe("POST");
+    expect((call[1].body as FormData).get("image")).toBeTruthy();
+    expect(out.proposals).toHaveLength(1);
+    expect(out.coverage).toBe("unverified");
+    expect(out.zero_detections_means_safe).toBe(false);
+  });
+
+  it("surfaces a 409 unavailability refusal and never retries", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(409, { detail: "Face proposals unavailable; manual whole-frame coverage review still required" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = await importClient({});
+    const file = new File([new Uint8Array([9])], "scene.png", { type: "image/png" });
+    await expect(client.fetchFaceProposals(SOURCE, file)).rejects.toThrow(/manual whole-frame coverage review still required.*409.*No automatic retry/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a result that claims zero detections mean safe", async () => {
+    const bad = { ...proposalsBody(), proposals: [], zero_detections_means_safe: true };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(200, bad)));
+    const client = await importClient({});
+    const file = new File([new Uint8Array([9])], "scene.png", { type: "image/png" });
+    await expect(client.fetchFaceProposals(SOURCE, file)).rejects.toThrow(/Invalid response format/);
+  });
+
+  it("rejects a result that claims automatic treatment or provider calls", async () => {
+    const file = new File([new Uint8Array([9])], "scene.png", { type: "image/png" });
+    const client = await importClient({});
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(200, { ...proposalsBody(), automatic_treatment_applied: true })));
+    await expect(client.fetchFaceProposals(SOURCE, file)).rejects.toThrow(/Invalid response format/);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(200, { ...proposalsBody(), provider_calls_this_request: 1 })));
+    await expect(client.fetchFaceProposals(SOURCE, file)).rejects.toThrow(/Invalid response format/);
+  });
+
+  it("rejects malformed proposal boxes", async () => {
+    const bad = proposalsBody();
+    (bad.proposals[0] as Record<string, unknown>).review_region = [1, 2, 3];
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(200, bad)));
+    const client = await importClient({});
+    const file = new File([new Uint8Array([9])], "scene.png", { type: "image/png" });
+    await expect(client.fetchFaceProposals(SOURCE, file)).rejects.toThrow(/Invalid response format/);
+  });
+});

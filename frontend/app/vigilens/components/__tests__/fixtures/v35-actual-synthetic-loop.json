@@ -1,0 +1,68 @@
+{
+  "source_digest": "1f7735c06f6c8f79bea5e90ffd95e389fda6b5921af8516f2dd66dcd06d2afa0",
+  "original_result_sha256": "694b76f477007d5589a54c3d547038bb2537f84a8c33766acb4322decf4b0888",
+  "status": "human_review_required",
+  "original_unknown_person_ids": [
+    "0"
+  ],
+  "attempts": [
+    {
+      "person_id": "0",
+      "attempt_id": "935e62c002b7562e4b73bd7627f93e6b1d40ea7d25833c8ac1bea63c5e85812a",
+      "state": "completed",
+      "candidate": {
+        "candidate_observations": {
+          "helmet": "unknown",
+          "vest": "absent"
+        },
+        "candidate_response": {
+          "accuracy_status": "not_validated",
+          "actual_debit": "unchecked",
+          "evidence_export_allowed": false,
+          "listed_cost_usd": "0.000465",
+          "model": "muse-spark-1.3",
+          "observation": {
+            "helmet": "unknown",
+            "helmet_evidence": "synthetic head evidence",
+            "vest": "absent",
+            "vest_evidence": "synthetic torso evidence"
+          },
+          "provider_revision": "not_returned",
+          "response_id": "synthetic-response",
+          "response_sha256": "996434821ae4398cabe17a349336b432ecd0e8f72deaeebc842cfb9896384771",
+          "usage": {
+            "input_tokens": 100,
+            "output_tokens": 80
+          }
+        },
+        "contradictions": [],
+        "crop_person_association": {
+          "basis": "single_crop_mask_centre_and_original_foreground_overlap_not_identity_proof",
+          "intersection_pixels": 1200,
+          "minimum_iou": 0.5,
+          "union_pixels": 1200
+        },
+        "evidence_export_allowed": false,
+        "original_observations": {
+          "helmet": "unknown",
+          "vest": "absent"
+        },
+        "original_overwrite_allowed": false,
+        "person_id": "0",
+        "result_sha256": "694b76f477007d5589a54c3d547038bb2537f84a8c33766acb4322decf4b0888",
+        "review_display_proposal": {
+          "helmet": "unknown",
+          "vest": "absent"
+        },
+        "source_digest": "1f7735c06f6c8f79bea5e90ffd95e389fda6b5921af8516f2dd66dcd06d2afa0",
+        "status": "needs_human_review"
+      },
+      "original_overwrite_allowed": false
+    }
+  ],
+  "unattempted_unknown_person_ids": [],
+  "automatic_candidate_adoption": false,
+  "automatic_retry": false,
+  "evidence_export_allowed": false,
+  "notice": "Original observations retained. Completed candidates and unresolved/uncertain attempts require human review; no safety clearance."
+}

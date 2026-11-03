@@ -61,7 +61,7 @@ const FRAMEWORK_SESSION_PATH = "/_agent-native/auth/session";
 
 describe("framework (UI login) session verification", () => {
   it("accepts a UI-login an_session verified through the framework session endpoint; the better-auth check is not called", async () => {
-    const fetchMock = vi.fn((url: unknown) => {
+    const fetchMock = vi.fn((url: unknown, _init?: RequestInit) => {
       const u = String(url);
       if (u.includes(FRAMEWORK_SESSION_PATH)) {
         return Promise.resolve(new Response(JSON.stringify({ email: SESSION.email }), { status: 200 }));
@@ -77,7 +77,9 @@ describe("framework (UI login) session verification", () => {
     expect(fetchMock.mock.calls.some((c) => String(c[0]).includes(FRAMEWORK_SESSION_PATH))).toBe(true);
     expect(fetchMock.mock.calls.some((c) => String(c[0]).includes(SELF_AUTH_PATH))).toBe(false);
     const fwCall = fetchMock.mock.calls.find((c) => String(c[0]).includes(FRAMEWORK_SESSION_PATH));
-    expect((fwCall?.[1] as RequestInit).headers).toEqual({ cookie: "an_session=fw-token-123" });
+    const fwInit = fwCall?.[1];
+    expect(fwInit).toBeDefined();
+    expect(fwInit?.headers).toEqual({ cookie: "an_session=fw-token-123" });
     expect(backendCalls(fetchMock)).toHaveLength(1);
   });
 

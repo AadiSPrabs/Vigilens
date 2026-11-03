@@ -29,9 +29,17 @@ def render_private_pdf(report,overlay_png,*,_pages_only=False):
             if y>height-110:new_page()
             draw.text((72,y),part,fill='#251f21',font=font or regular);y+=32
     new_page()
-    line('Source pixel identity: '+report['source_digest'],small)
+    def hashed(label,value):
+        # Chunk long hex digests so fixed-width wrapping never splits mid-word.
+        chunks=' '.join(textwrap.wrap(str(value),32))
+        line(label+':',small)
+        line(chunks,small)
+    hashed('Source pixel identity',report['source_digest'])
     line('Assessment: '+report['assessment_id'],small)
-    line('Private preview image: '+report['derivative_sha256'],small)
+    hashed('Private preview image',report['derivative_sha256'])
+    if report.get('image_withheld'):
+        line('Image withheld by operator: full-frame opaque redaction applied as a privacy fallback.',small)
+        line('Not face-area masking and NOT evidence that no faces are present; PPE findings from this image are withheld; no safety clearance.',small)
     line('Privacy: '+report['privacy_review_status']+'. No hidden original fallback.',small)
     if report.get('clip_sample_label'):line(report['clip_sample_label'],small)
     if report.get('face_covering_review'):line('Face already hidden by opaque worn shield: operator claim, not privacy validation.',small)
@@ -64,7 +72,7 @@ def render_private_pdf(report,overlay_png,*,_pages_only=False):
     scale=min(max_w/overlay.width,max_h/overlay.height,8)
     shown=overlay.resize((max(1,round(overlay.width*scale)),max(1,round(overlay.height*scale))),Image.Resampling.LANCZOS)
     page.paste(shown,((width-shown.width)//2,y));y+=shown.height+18
-    line('Mask edges: person teal, helmet purple, vest blue; operator zones amber.',small)
+    if not report.get('image_withheld'):line('Mask edges: person teal, helmet purple, vest blue; operator zones amber.',small)
     line('PPE mask overlap alone does not establish gear is worn.',small)
     line('Image is an operator-reviewed private preview, not validated shareable evidence.',small)
     rule_review=report.get('configured_rule_review',{})
@@ -114,6 +122,25 @@ def render_private_pdf(report,overlay_png,*,_pages_only=False):
             line('Person '+row['person_id']+' | Rule '+row['rule_id']+' | '+row['status'].replace('_',' '),small)
             line(row['model_commentary'],small)
         line('Deterministic status and priority remain authoritative; commentary cannot change them.',small)
+    rechecks=report.get('deliberate_rechecks',{})
+    if rechecks and rechecks.get('status') not in (None,'not_configured'):
+        if y+200>height-110:new_page()
+        y+=16;line('Deliberate rechecks - separate candidates, human review required')
+        line('Original observations above are retained and authoritative. Candidates are separate; automatic adoption: '+str(rechecks.get('automatic_candidate_adoption',False))+'. No safety clearance.',small)
+        for attempt in rechecks.get('attempts',[]):
+            if y+180>height-110:new_page()
+            person=(attempt.get('binding')or{}).get('person_id','?')
+            line('Person '+str(person)+' | '+str(attempt.get('state','unknown')).replace('_',' ')+' | candidate adoption requires separate human review')
+            result=attempt.get('result')
+            obs=result.get('candidate_observations') if isinstance(result,dict) else None
+            if isinstance(obs,dict) and obs:
+                line('Candidate observations (unvalidated, separate): '+', '.join(str(k)+': '+str(v) for k,v in obs.items()),small)
+            elif result:
+                line('Candidate result returned; inspect the JSON report for the full record.',small)
+            else:
+                line('No candidate returned; held for human review. No automatic retry.',small)
+        unresolved=rechecks.get('unresolved_unknown_person_ids') or []
+        if unresolved:line('Unresolved unknowns (no cleared status): '+', '.join(str(p) for p in unresolved),small)
     if page is not None:pages.append(page)
     if len(pages)>32:raise ValueError('Private document page quota exceeded')
     for index,p in enumerate(pages):

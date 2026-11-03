@@ -6,6 +6,8 @@
 import { createHash } from "node:crypto";
 import { createError, getRequestHost, getHeader, type H3Event } from "h3";
 import { getSession } from "@agent-native/core/server";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { getVisitorKey } from "./vigilens-keys";
 
 const BACKEND_URL = () => (process.env.VIGILENS_BACKEND_URL || "").replace(/\/+$/, "");
@@ -30,24 +32,88 @@ export async function requireVigilensSession(event: H3Event) {
 }
 
 const BA_SESSION_COOKIE_RE = /(?:^|;\s*)(?:__Secure-)?[\w.-]*session_token\s*=/;
-const FRAMEWORK_SESSION_COOKIE = "an_session";
 const FRAMEWORK_SESSION_PATH = "/_agent-native/auth/session";
 
-function cookieValue(cookieHeader: string, name: string): string | null {
+// Framework session cookie candidates. This mirrors
+// @agent-native/core@0.222.2 dist/server/cookie-namespace.js, which the
+// package does NOT re-export from its "./server" subpath (verified against
+// the package exports map), so the derivation is replicated here and pinned
+// to that version. The framework namespaces its session cookie
+// an_session_<appSlug> whenever an app slug is in force (APP_NAME in any
+// mode, or the package name in non-production local-isolated mode with no
+// COOKIE_DOMAIN), plain "an_session" otherwise; its non-first-party read
+// list is the clear-set in insertion order: [primary, "an_session",
+// "an_session_<slug>"]. SCOPE CUT, documented: framework WORKSPACE-mode
+// membership and ordering (primary an_session_workspace or an isolated
+// an_session_<slug>, with an_session_workspace joining the read list) is
+// NOT replicated - this replica covers exactly the non-workspace
+// configurations this app is deployed in, and if the app is ever run in
+// framework workspace mode this list must be re-derived from the framework
+// rather than extended by hand. A first-party agent-native.com isolated
+// realm reads ONLY its primary name; this app never runs in one (no
+// agent-native.com cookie domain), and the framework itself throws without
+// an app id if one were ever configured. Selection
+// mirrors getLegacyCookieSession (dist/server/auth.js): iterate candidates
+// in order, dedupe by value, and the FIRST token that resolves to a session
+// email is the framework identity - a stale or invalid earlier cookie never
+// blocks a later valid one, and a later valid cookie for a different
+// account never overrides the first. Verification strength is unchanged:
+// every candidate token still goes through verifiedFrameworkEmail (the
+// database-backed loopback self-check) and vouches only when it equals the
+// identity core resolved for this request.
+function slugifyAppName(raw: string): string {
+  // Exact mirror of the framework's slugifyAppName.
+  return raw.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
+
+let cachedPackageName: string | undefined;
+function packageName(): string {
+  if (cachedPackageName === undefined) {
+    try {
+      const raw = readFileSync(join(process.cwd(), "package.json"), "utf8");
+      const parsed = JSON.parse(raw) as { name?: unknown };
+      cachedPackageName = typeof parsed.name === "string" ? parsed.name : "";
+    } catch {
+      cachedPackageName = "";
+    }
+  }
+  return cachedPackageName;
+}
+
+function frameworkCookieCandidates(): string[] {
+  const cookieDomain = (process.env.COOKIE_DOMAIN || "").trim();
+  const explicit = slugifyAppName(process.env.APP_NAME || "");
+  const local =
+    process.env.NODE_ENV !== "production" && !cookieDomain
+      ? slugifyAppName(process.env.npm_package_name || packageName())
+      : "";
+  const slug = explicit || local;
+  const primary = cookieDomain ? "an_session" : slug ? `an_session_${slug}` : "an_session";
+  const names = [primary, "an_session"];
+  if (slug) names.push(`an_session_${slug}`);
+  return [...new Set(names)];
+}
+
+// Every value a name carries in the raw Cookie header, in order (H3 keeps
+// only the first duplicate; the framework reads them all, and so do we).
+function cookieValues(cookieHeader: string, name: string): string[] {
+  const out: string[] = [];
   for (const part of cookieHeader.split(";")) {
     const eq = part.indexOf("=");
     if (eq < 0) continue;
     if (part.slice(0, eq).trim() === name) {
       const value = part.slice(eq + 1).trim();
-      return value.length > 0 ? value : null;
+      if (value) out.push(value);
     }
   }
-  return null;
+  return out;
 }
 
 // Two session kinds reach this app:
 // - The UI sign-in page authenticates through the framework's own
-//   /_agent-native/auth/login and sets `an_session`. That token resolves
+//   /_agent-native/auth/login and sets the framework session cookie
+//   (`an_session`, namespaced an_session_<appSlug> when an app slug is in
+//   force - see frameworkCookieCandidates). That token resolves
 //   against the server-side sessions table on EVERY request (no signed
 //   cookie cache), so re-checking it through the framework session endpoint
 //   is database-authoritative: logout deletes the row and the next check
@@ -57,16 +123,23 @@ function cookieValue(cookieHeader: string, name: string): string | null {
 // - Direct better-auth sign-in sets `an.session_token` plus a 5-minute
 //   SIGNED cookie cache, so it needs the disableCookieCache database check.
 // The verified identity must match the session core resolved: a request can
-// carry both cookies, and core tries better-auth first, so an `an_session`
-// belonging to another account must not vouch for a better-auth identity.
+// carry both cookies, and core tries better-auth first, so a framework
+// cookie belonging to another account must not vouch for a better-auth
+// identity.
 async function requireVerifiedSessionFor(event: H3Event, email: string) {
   const cookie = getHeader(event, "cookie") || "";
-  const frameworkToken = cookieValue(cookie, FRAMEWORK_SESSION_COOKIE);
-  if (frameworkToken) {
-    const verified = await verifiedFrameworkEmail(event, frameworkToken);
-    if (verified && verified.toLowerCase() === email.toLowerCase()) return;
-    if (!BA_SESSION_COOKIE_RE.test(cookie)) {
-      throw createError({ statusCode: 401, statusMessage: "Sign in required" });
+  const seen = new Set<string>();
+  candidates: for (const name of frameworkCookieCandidates()) {
+    for (const token of cookieValues(cookie, name)) {
+      if (seen.has(token)) continue;
+      seen.add(token);
+      const verified = await verifiedFrameworkEmail(event, name, token);
+      if (!verified) continue; // stale/invalid: try the next candidate, like the framework
+      if (verified.toLowerCase() === email.toLowerCase()) return;
+      // The first RESOLVING token is the framework identity. A valid token
+      // for a different account never vouches, and no later cookie overrides
+      // it - fall through to the better-auth check or 401.
+      break candidates;
     }
   }
   if (BA_SESSION_COOKIE_RE.test(cookie)) {
@@ -83,7 +156,7 @@ async function requireVerifiedSessionFor(event: H3Event, email: string) {
 // answers 200 with {"error":"Not authenticated"} for a dead token, so only a
 // body email counts. Only the framework cookie is forwarded - a stale
 // better-auth jar must not ride along and satisfy this check.
-async function verifiedFrameworkEmail(event: H3Event, token: string): Promise<string | null> {
+async function verifiedFrameworkEmail(event: H3Event, name: string, token: string): Promise<string | null> {
   const localPort = event.node?.req?.socket?.localPort;
   const port = localPort || process.env.PORT;
   if (!port) {
@@ -92,7 +165,7 @@ async function verifiedFrameworkEmail(event: H3Event, token: string): Promise<st
   let res: Response;
   try {
     res = await fetch(`http://127.0.0.1:${port}${FRAMEWORK_SESSION_PATH}`, {
-      headers: { cookie: `${FRAMEWORK_SESSION_COOKIE}=${token}` },
+      headers: { cookie: `${name}=${token}` },
       signal: AbortSignal.timeout(10_000),
       redirect: "error",
     });

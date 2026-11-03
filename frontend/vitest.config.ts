@@ -10,6 +10,18 @@ export default defineConfig({
     },
   },
   test: {
+    server: {
+      deps: {
+        // The provider-schema conformance loader does a native dynamic import()
+        // of the generated actions registry, whose imports are extensionless
+        // (the pinned generator emits them that way). Externalized, that import
+        // bypasses Vite resolution and fails; inline just this module so the
+        // registry loads through the Vite pipeline. No dependency changes.
+        // (whole package: the testing.js entry re-exports the conformance
+        // module, so inlining only the leaf never reaches it through Vite)
+        inline: [/@agent-native\/core/],
+      },
+    },
     exclude: [
       "**/node_modules/**",
       "**/.git/**",

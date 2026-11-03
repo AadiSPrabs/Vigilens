@@ -50,7 +50,7 @@ def test_report_rules_use_hidden_evidence_as_unknown(material):
 
 @pytest.mark.parametrize('patch',[{'source_digest':'0'*64},{'result_sha256':'0'*64},{'zones_sha256':'0'*64},{'extra':True}])
 def test_rule_review_rejects_changed_binding(material,patch):
- p,raw,frame,calls,c,job=material;prepare(c,raw,frame);submit(c,frame,job)
+ p,raw,frame,calls,c,job=material;x=prepare(c,raw,frame);acknowledge(c,x);submit(c,frame,job)
  assert rules(c,frame,job,patch).status_code==409 and len(calls)==2
 
 def test_rule_geometry_and_tampering(material):

@@ -86,7 +86,12 @@ class ExplanationExecutor:
     def run(self,identity,current_plan):
         existing=self.read(identity)
         if existing['context_sha256']!=current_plan['context_sha256']:raise ValueError('Current review context changed')
-        if existing['state']=='reserved_not_dispatched'and self.service.transport is disabled_transport:raise LiveTransportDisabled('Explanation dispatch not enabled; no claim, state change or call created')
+        if existing['state']=='reserved_not_dispatched':
+            # Full readiness gate on a real pipeline; the ArchiveExplanation facade
+            # borrows carry() only and keeps the legacy disabled_transport refusal.
+            gate=getattr(self.service,'require_dispatch_ready',None)
+            if gate is not None:gate('Explanation')
+            elif self.service.transport is disabled_transport:raise LiveTransportDisabled('Explanation dispatch not enabled; no claim, state change or call created')
         self.approve(current_plan);c=self.service.connect()
         try:
             c.execute('BEGIN IMMEDIATE');total(c)

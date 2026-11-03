@@ -1,0 +1,101 @@
+{
+  "template_id": "8c241c568c53d0028178f637b8c7d86405fdce09d6be36bdf146f8938114e961",
+  "template": {
+    "basis": "operator_confirmed_fixed_scene_not_automatic_registration",
+    "camera_binding": {
+      "camera_id": "synthetic-fixed-camera",
+      "coordinate_space": "normalized_upright_source_v1",
+      "height": 80,
+      "scene_revision": "scene1",
+      "transform": "identity",
+      "width": 80
+    },
+    "format": "vigilens.camera-zone-template.v1",
+    "result_sha256": "694b76f477007d5589a54c3d547038bb2537f84a8c33766acb4322decf4b0888",
+    "reviewer_label": "synthetic operator",
+    "source_digest": "1f7735c06f6c8f79bea5e90ffd95e389fda6b5921af8516f2dd66dcd06d2afa0",
+    "zone_event_id": 1,
+    "zones": [
+      {
+        "hazard": true,
+        "id": "yard",
+        "name": "Yard",
+        "points": [
+          {
+            "x": 0.05,
+            "y": 0.2
+          },
+          {
+            "x": 0.4,
+            "y": 0.2
+          },
+          {
+            "x": 0.4,
+            "y": 0.9
+          },
+          {
+            "x": 0.05,
+            "y": 0.9
+          }
+        ]
+      }
+    ],
+    "zones_sha256": "5d4b40933b586ff302abedb30041dc7e0cb9e7637c00aeafdfee252bf31d005c"
+  },
+  "zone_review": {
+    "contract_version": "vigilens.zone-review.proposal.v1",
+    "source_digest": "1f7735c06f6c8f79bea5e90ffd95e389fda6b5921af8516f2dd66dcd06d2afa0",
+    "result_sha256": "694b76f477007d5589a54c3d547038bb2537f84a8c33766acb4322decf4b0888",
+    "zone_snapshot": {
+      "event_id": 2,
+      "zones": [
+        {
+          "id": "yard",
+          "name": "Yard",
+          "hazard": true,
+          "points": [
+            {
+              "x": 0.05,
+              "y": 0.2
+            },
+            {
+              "x": 0.4,
+              "y": 0.2
+            },
+            {
+              "x": 0.4,
+              "y": 0.9
+            },
+            {
+              "x": 0.05,
+              "y": 0.9
+            }
+          ]
+        }
+      ],
+      "zones_sha256": "5d4b40933b586ff302abedb30041dc7e0cb9e7637c00aeafdfee252bf31d005c",
+      "reviewer_label": "synthetic operator",
+      "at": 1793642707.4004917
+    },
+    "persons": [
+      {
+        "person_id": "0",
+        "zone_ids": null,
+        "display_zone_id": null,
+        "status": "needs_manual_contact_review",
+        "basis": "operator_zones_and_current_manual_contact_not_automatic",
+        "safety_decision": false
+      }
+    ],
+    "policy_status": "not_applied",
+    "compliance_status": "not_evaluated",
+    "automatic_contact": false,
+    "privacy_review_status": "not_validated",
+    "evidence_export_allowed": false,
+    "provider_calls_this_request": 0
+  },
+  "automatic_scene_verification": false,
+  "rules_or_contacts_transferred": false,
+  "provider_calls_this_request": 0,
+  "evidence_export_allowed": false
+}

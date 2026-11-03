@@ -117,3 +117,18 @@ def test_pg_governed_route_contention_maps_to_409(pg_uri, tmp_path, monkeypatch)
     finally:
         holder.rollback()
         holder.close()
+
+
+def test_pg_legacy_journal_schema_hard_refuses_preserving_records(pg_uri, tmp_path, monkeypatch):
+    # A Postgres journal whose jobs primary key is not (owner, source) carries
+    # history this code has not verified: refuse loudly, preserve every record.
+    import psycopg
+    with psycopg.connect(pg_uri, autocommit=True) as c:
+        c.execute("CREATE TABLE jobs(source TEXT PRIMARY KEY,state TEXT,reserved TEXT,cost TEXT,binding TEXT,result TEXT,result_sha TEXT,started DOUBLE PRECISION,key_fp TEXT)")
+        c.execute("INSERT INTO jobs VALUES('paid-source','completed','1','0.0025','{}',NULL,NULL,1.0,NULL)")
+    p = _pg_pipeline(pg_uri, tmp_path, monkeypatch, lambda body: response('unknown', 'absent'))
+    with pytest.raises(ValueError) as e:
+        p.connect()
+    assert 'Legacy Postgres journal schema' in str(e.value)
+    with psycopg.connect(pg_uri) as c:
+        assert c.execute("SELECT state FROM jobs WHERE source='paid-source'").fetchone()[0] == 'completed'

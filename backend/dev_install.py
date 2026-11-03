@@ -222,7 +222,7 @@ def load_service(config_path, transport='synthetic', key_file=None):
 
 def main():
     p = argparse.ArgumentParser(description='Offline developer-install setup for the Vigilens synthetic integration mode')
-    p.add_argument('action', choices=('setup', 'approve'))
+    p.add_argument('action', choices=('setup', 'approve', 'export-approvals'))
     p.add_argument('--state-dir', required=True)
     p.add_argument('--image', action='append', default=[], help='test image to approve (repeatable); PNG or JPEG')
     p.add_argument('--origin', action='append', default=[], help='allowed loopback frontend origin, e.g. http://localhost:5173 (repeatable)')
@@ -237,6 +237,17 @@ def main():
         print('  API key file:' , config['access_token_file'], '(read it locally; never commit or share it)')
         print('  approved test images:', len(json.loads((Path(a.state_dir) / 'approvals.json').read_bytes())['approvals']))
         print('Next: python3.10 run_dev.py --config', str(Path(a.state_dir) / 'dev-config.json'))
+    elif a.action == 'export-approvals':
+        # Offline provisioning aid for the hosted (E2) path: print the exact
+        # pinned-document env pair for this install's approvals file. Shape is
+        # validated first so a malformed store is never exported. The values
+        # are provisioning material - never commit them.
+        import base64 as _b64
+        from fresh_review.approvals_seed import validate_document_shape
+        raw = (Path(a.state_dir) / 'approvals.json').read_bytes()
+        validate_document_shape(raw)
+        print('VIGILENS_APPROVALS_SHA256=' + hashlib.sha256(raw).hexdigest())
+        print('VIGILENS_APPROVALS_DOC_JSON=' + _b64.b64encode(raw).decode())
     else:
         if not a.image or len(a.image) != 1:
             p.error('approve needs exactly one --image')

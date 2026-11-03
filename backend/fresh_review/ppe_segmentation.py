@@ -123,7 +123,7 @@ class PpeSegmentation:
     async def run(self,identity):
         current=self.read(identity)
         if current['state']!='reserved_not_dispatched':return current
-        if self.service.transport is disabled_transport:raise LiveTransportDisabled('SAM PPE dispatch not enabled; no claim, state change or call created')
+        self.service.require_dispatch_ready('SAM PPE')
         plan=self.plan(current['source_digest']);self.approve(plan);c=self.service.connect()
         try:
             c.execute('BEGIN IMMEDIATE');total(c)

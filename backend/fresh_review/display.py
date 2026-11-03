@@ -78,6 +78,9 @@ def create_display():
         im = Image.open(io.BytesIO(png));im.load()
         if im.mode != 'RGB' or im.size != (meta['width'], meta['height']) or im.info:
             raise ValueError('Pixels-only unchanged-size RGB required')
+        if meta.get('image_withheld') is not None:
+            if any(p != (0, 0, 0) for p in im.getdata()):
+                raise ValueError('Withheld-image full-frame redaction did not survive encoding')
         for region in meta['regions'] if meta.get('redaction_method','opaque') == 'opaque' else []:
             pixels = im.crop(tuple(region['box'])).convert('RGBA')
             if any(p != (0, 0, 0, 255) for p in pixels.getdata()):
@@ -122,13 +125,15 @@ def create_display():
         try:
             r = json.loads(review)
             allowed=set(r)if isinstance(r,dict)else set()
-            if not isinstance(r,dict)or allowed-{'face_coverings'} not in ({'source_digest','frame_size','regions','reviewer_label'},{'source_digest','frame_size','regions','reviewer_label','redaction_method'}):raise ValueError('Exact source/frame/region review required')
+            if not isinstance(r,dict)or allowed-{'face_coverings','image_withheld'} not in ({'source_digest','frame_size','regions','reviewer_label'},{'source_digest','frame_size','regions','reviewer_label','redaction_method'}):raise ValueError('Exact source/frame/region review required')
             frame = decode_image(data, image.content_type)
             if frame.orientation != 1:
                 raise ValueError('Only upright sources accepted; region coordinates use canonical upright pixels')
             method = r.pop('redaction_method', 'opaque')
             if method not in ('opaque', 'blur'):
                 raise ValueError('Unknown display method')
+            if r.get('image_withheld') is not None and method != 'opaque':
+                raise ValueError('Withholding the image requires opaque full-frame redaction; blur cannot withhold pixels')
             png, meta = probe(data, image.content_type, **r)
             meta['redaction_method'] = method
             if method == 'blur':
@@ -141,7 +146,10 @@ def create_display():
             verify_derivative(png, meta)
             if decode_image(png, 'image/png').digest == frame.digest and not (meta.get('face_coverings')and not meta['regions']):
                 raise ValueError('Regions must change source pixels')
-            meta['regions_digest'] = hashlib.sha256(json.dumps({'regions':meta['regions'],'face_coverings':meta['face_coverings']}if meta['face_coverings']else meta['regions'], sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+            digest_material={'regions':meta['regions'],'face_coverings':meta['face_coverings']}
+            if meta.get('image_withheld') is not None:digest_material['image_withheld']=meta['image_withheld']
+            if not meta['face_coverings'] and meta.get('image_withheld') is None:digest_material=meta['regions']
+            meta['regions_digest'] = hashlib.sha256(json.dumps(digest_material, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
             meta['reviewer_label'] = r['reviewer_label'].strip()
         except (AuditError, ValueError, TypeError, KeyError, AttributeError, OSError, sqlite3.Error):
             raise HTTPException(422, 'Invalid source, regions or source/frame binding')

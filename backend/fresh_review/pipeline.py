@@ -100,6 +100,63 @@ class FreshPipeline:
         # visitor's job never collide with another account's job over identical bytes.
         # Owner '' is the operator/legacy internal namespace (pre-ownership rows).
         return 'fresh-'+owner+'-'+source+'-'+suffix if owner else 'fresh-'+source+'-'+suffix
+    def _sqlite_table_sql(self,c,name):
+        r=c.execute("SELECT sql FROM sqlite_master WHERE name=? AND type='table'",(name,)).fetchone()
+        return r[0] if r else None
+    def _migrate_sqlite_table(self,c,base,ddl,pk_fragment):
+        sql=self._sqlite_table_sql(c,base)
+        current=sql is not None and pk_fragment in sql.replace(' ','')
+        prev=base+'_prev';staging=base+'_staging'
+        sources=[]
+        if not current:
+            if sql is not None:
+                if self._sqlite_table_sql(c,staging) is not None:
+                    raise ValueError('Journal migration staging table already present; history preserved for manual inspection')
+                c.execute('ALTER TABLE '+base+' RENAME TO '+staging)
+            c.execute(ddl)
+            if sql is not None:sources.append(staging)
+        if self._sqlite_table_sql(c,prev) is not None:sources.append(prev)
+        for src in sources:
+            oldcols=[d[0] for d in c.execute('SELECT * FROM '+src+' LIMIT 0').description]
+            src_owner="COALESCE(owner,'')"if'owner'in oldcols else"''"
+            if base=='jobs':
+                kf="key_fp"if"key_fp"in oldcols else"NULL"
+                cols="owner,source,state,reserved,cost,binding,result,result_sha,started,key_fp"
+                rows=c.execute("SELECT "+src_owner+",source,state,reserved,cost,binding,result,result_sha,started,"+kf+" FROM "+src).fetchall();keyn=2
+            else:
+                cols="owner,source,ordinal,model,state,request_sha,response_sha,cost"
+                rows=c.execute("SELECT "+src_owner+",source,ordinal,model,state,request_sha,response_sha,cost FROM "+src).fetchall();keyn=3
+            keys=cols.split(',')[:keyn]
+            for r in rows:
+                key=tuple(r[:keyn])
+                ex=c.execute("SELECT "+cols+" FROM "+base+" WHERE "+" AND ".join(k+"=?" for k in keys),key).fetchone()
+                if ex is None:
+                    c.execute("INSERT INTO "+base+"("+cols+") VALUES("+",".join("?"*len(r))+")",tuple(r))
+                elif tuple(ex)!=tuple(r):
+                    # Fail closed: two DIFFERENT paid-history rows for one key. Never pick a
+                    # winner silently - roll back the whole migration and keep both tables.
+                    raise ValueError('Conflicting journal history for '+base+' key '+repr(key)+': differing rows in '+base+' and '+src+'; migration refused, both tables preserved for manual inspection')
+            c.execute('DROP TABLE '+src)
+    def _migrate_sqlite(self,c):
+        # One explicit write transaction for the whole migration: sqlite DDL is
+        # transactional, so BEGIN IMMEDIATE + commit/rollback makes the
+        # rename/copy/drop sequence all-or-nothing. The previous implicit flow
+        # autocommitted the rename and CREATE, then left the row-copy INSERT in an
+        # open implicit transaction; the next claim's BEGIN IMMEDIATE failed with
+        # 'cannot start a transaction within a transaction', the copy rolled back,
+        # and legacy rows stayed stranded in jobs_prev while the new empty
+        # composite table passed the schema check - silently dropping the
+        # no-repeat record of old paid jobs. This also repairs that half-migrated
+        # state (composite table beside a stranded *_prev) by merging the
+        # stranded rows before dropping the leftover. On any failure everything
+        # rolls back and the original tables are preserved.
+        c.execute('BEGIN IMMEDIATE')
+        try:
+            self._migrate_sqlite_table(c,'jobs',self._JOBS_DDL,'PRIMARYKEY(owner,source)')
+            self._migrate_sqlite_table(c,'calls',self._CALLS_DDL,'PRIMARYKEY(owner,source,ordinal)')
+            c.commit()
+        except Exception:
+            c.rollback();raise
     def _ensure_schema(self,c):
         # Composite (owner, source) journal identity. Existing data is never dropped:
         # a legacy source-only table is rebuilt IN PLACE with every row preserved
@@ -108,24 +165,17 @@ class FreshPipeline:
             rows=c.execute("SELECT kcu.column_name FROM information_schema.table_constraints tc JOIN information_schema.key_column_usage kcu ON tc.constraint_name=kcu.constraint_name AND tc.table_name=kcu.table_name WHERE tc.table_name='jobs' AND tc.constraint_type='PRIMARY KEY' ORDER BY kcu.ordinal_position").fetchall()
             if [r[0] for r in rows]==['owner','source']:
                 c.execute(self._JOBS_DDL);c.execute(self._CALLS_DDL);return
-        else:
-            row=c.execute("SELECT sql FROM sqlite_master WHERE name='jobs' AND type='table'").fetchone()
-            if row and 'PRIMARYKEY(owner,source)' in row[0].replace(' ',''):
+            if not c.execute("SELECT 1 FROM information_schema.tables WHERE table_name='jobs'").fetchone():
                 c.execute(self._JOBS_DDL);c.execute(self._CALLS_DDL);return
-        try:c.execute('ALTER TABLE jobs RENAME TO jobs_prev')
-        except sqlite3.Error:c.execute(self._JOBS_DDL);c.execute(self._CALLS_DDL);return
-        c.execute(self._JOBS_DDL)
-        try:oldcols=[d[0] for d in c.execute('SELECT * FROM jobs_prev LIMIT 0').description]
-        except sqlite3.Error:oldcols=[]
-        has_owner='owner' in oldcols
-        src_owner="COALESCE(owner,'')"if has_owner else"''"
-        c.execute("INSERT INTO jobs(owner,source,state,reserved,cost,binding,result,result_sha,started,key_fp) SELECT "+src_owner+",source,state,reserved,cost,binding,result,result_sha,started,"+("key_fp"if"key_fp"in oldcols else"NULL")+" FROM jobs_prev")
-        c.execute('DROP TABLE jobs_prev')
-        try:c.execute('ALTER TABLE calls RENAME TO calls_prev')
-        except sqlite3.Error:c.execute(self._CALLS_DDL);return
-        c.execute(self._CALLS_DDL)
-        c.execute("INSERT INTO calls(owner,source,ordinal,model,state,request_sha,response_sha,cost) SELECT '',source,ordinal,model,state,request_sha,response_sha,cost FROM calls_prev")
-        c.execute('DROP TABLE calls_prev')
+            # Fail closed on a legacy Postgres journal: this code has not verified that
+            # history, and an in-place rebuild of a live store must never run unreviewed.
+            # Loud refusal; every record is preserved for a manual, owner-approved migration.
+            raise ValueError('Legacy Postgres journal schema (jobs primary key is not (owner,source)); refusing in-place migration - all records preserved for manual inspection')
+        else:
+            row=self._sqlite_table_sql(c,'jobs')
+            if row and 'PRIMARYKEY(owner,source)' in row.replace(' ','') and self._sqlite_table_sql(c,'jobs_prev') is None and self._sqlite_table_sql(c,'calls_prev') is None:
+                c.execute(self._JOBS_DDL);c.execute(self._CALLS_DDL);return
+            self._migrate_sqlite(c);return
     def connect(self):
         if self._dsn is not None:
             c=open_store(self._dsn)
@@ -301,7 +351,54 @@ class FreshPipeline:
         try:
             if c.execute("SELECT 1 FROM sqlite_master WHERE name='display_derivatives'").fetchone()and c.execute('SELECT 1 FROM display_derivatives WHERE pixel_digest=?',(pixel,)).fetchone():raise ValueError('Display derivative cannot be provider source')
         finally:c.close()
+    def require_dispatch_ready(self, action):
+        """Shared pre-dispatch readiness gate for the auxiliary executors (recheck,
+        SAM PPE segmentation, explanation). Each executor previously checked only
+        'transport is disabled_transport' and then flipped its attempt row from
+        reserved_not_dispatched to attempted_uncertain BEFORE calling the transport;
+        under the hosted BYOK wiring (MetaRequestTransport, no request visitor key)
+        the key-less transport then refused at __call__ and the attempt was wedged
+        into the no-retry hold without any call being possible. Checking the FULL
+        readiness here - configured transport, plus the same LIVE_DISPATCH + visitor
+        key pair the governed route and _live_dispatch_preflight enforce - keeps a
+        refusal zero-state: the attempt stays reserved_not_dispatched, the shared
+        reservation stays booked against nothing new, and no retry semantics change
+        (a completed attempt is still served, an unreserved one still returns as-is).
+        Callers pass their own action label so refusal messages stay route-honest."""
+        if self.transport is disabled_transport:raise LiveTransportDisabled(action+' dispatch not enabled; no claim, state change or call created')
+        if self.execution_scope!='private_provider_processing':return
+        from .transport import MetaRequestTransport,CURRENT_VISITOR_KEY
+        if not isinstance(self.transport,MetaRequestTransport):return
+        import os as _os
+        if _os.environ.get('VIGILENS_LIVE_DISPATCH','off')!='on':raise LiveTransportDisabled(action+' provider execution disabled; no claim, state change or call created')
+        if not CURRENT_VISITOR_KEY.get():raise LiveTransportDisabled('No visitor key for this request; '+action.lower()+' execution disabled')
+    def _live_dispatch_preflight(self):
+        """Pre-journal live gate (D4 followup): under LIVE wiring (private_provider_processing
+        scope with a real Meta transport), a request must clear BOTH dispatch conditions
+        before ANY state changes - before the seamless approval mint in prepare(), before
+        the journal claim/reservation in run(). The upload/clip routes never set the
+        request visitor key and never check VIGILENS_LIVE_DISPATCH (that gate exists only
+        on /fresh-review-audit-governed); without this preflight an off-gate upload on
+        those routes minted a live-scope approval, booked the full reservation, then
+        wedged the digest journal-globally as running_uncertain when the key-less
+        transport refused at dispatch. Refusing here keeps every refusal zero-dispatch,
+        zero-claim, zero-reservation, zero-mint. Synthetic scope is untouched: its
+        transport is not a Meta subclass, so the seamless demo flow (upload IS the
+        recorded synthetic approval, then completion) is unchanged. This mirrors the
+        governed route's two checks; it does not widen dispatch authority - the same
+        env var and the same request-scoped key, enforced earlier."""
+        if self.execution_scope!='private_provider_processing':return
+        from .transport import MetaRequestTransport,CURRENT_VISITOR_KEY
+        if not isinstance(self.transport,MetaRequestTransport):return
+        # Scope: the BYOK request-keyed transport only. An install-key MetaTransport
+        # carries the install's own standing dispatch decision (the operator placed
+        # the key file); LIVE_DISPATCH + the per-request visitor key are the
+        # request-scoped controls, mirroring the governed route's two checks.
+        import os as _os
+        if _os.environ.get('VIGILENS_LIVE_DISPATCH','off')!='on':raise LiveTransportDisabled('Fresh provider execution disabled; no approval, claim or call created')
+        if not CURRENT_VISITOR_KEY.get():raise LiveTransportDisabled('No visitor key for this request; fresh provider execution disabled')
     def prepare(self,raw,mime,zones):
+        self._live_dispatch_preflight()
         if zones!=[]:raise ValueError('Fresh preparation supports no-zone policy only')
         frame=decode_image(raw,mime)
         self.reject_derivative(frame.digest)

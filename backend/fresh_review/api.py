@@ -11,6 +11,14 @@ from .zones import ZoneStore,assess_zones
 from .rule_review import RuleStore,evaluate_report_rules
 from .ppe_basis import contract_ppe as _contract_ppe,counts as _pb_counts,unresolved as _unresolved
 
+def _overlay_or_withheld(meta,render,png,*args):
+    # An operator-withheld image gets NO mask/zone/PPE overlay: drawing person
+    # geometry on the black frame would leak layout and imply visible evidence.
+    if meta.get('image_withheld') is not None:
+        import hashlib
+        return png,hashlib.sha256(png).hexdigest()
+    return render(png,*args)
+
 def _visitor_owner(session):
     # STRUCTURAL visitor-account requirement on every visitor route: the proxy
     # always sets X-Vigilens-Display-Session to its displaySessionFor value
@@ -94,7 +102,7 @@ def create_router(service,display):
             if not job or job.get('state')not in('completed','partial_completed','archived_verified')or not job.get('result'):raise ValueError('Terminal result required')
             out=to_frontend_audit(job['result'],audit_id='fresh:'+frame.digest+':'+digest(job['result']),job_state=job['state'],source_digest=frame.digest,zones=vz)
             BOUND.add((x_vigilens_display_session,frame.digest))
-            out['zones_applied']=False;out['zones_semantics']='Posted zones are validated and echoed only. The stored result was produced without zones: no zone membership was determined (no ground-contact review exists), every person is unknown for every zone, and zones_applied=false means no zone check happened.'
+            out['zones_semantics']=out['zones_applied_meaning']+' The stored result itself was produced without zones; membership comes from the stored masks at view time and no provider call happened here.'
             return out
         except AuditError:raise
         except (ValueError,KeyError,TypeError,OSError,sqlite3.Error):raise HTTPException(409,'No presentable stored result for this exact image (none stored, or not safe to present); new-image analysis is not enabled here')
@@ -124,6 +132,7 @@ def create_router(service,display):
             executor=getattr(SERVICE,'recheck_executor',None)
             if executor is None:raise ValueError('No exact reviewed recheck executor configured')
             attempt=executor.read(attempt_id)
+            if attempt.get('owner','')!=_visitor_owner(x_vigilens_display_session):raise ValueError('Attempt belongs to another owner')
             if attempt['plan']['source_digest']!=source or attempt['plan']['result_sha256']!=digest(job['result']):raise ValueError('Attempt belongs to another immutable source/result')
             return recheck_view(await executor.run(attempt_id))
         except LiveTransportDisabled:raise HTTPException(503,'Recheck execution disabled; no claim or call created')
@@ -149,6 +158,7 @@ def create_router(service,display):
             helper=getattr(SERVICE,'ppe_segmentation',None)
             if helper is None:raise ValueError('No exact-granted SAM PPE batch configured')
             batch=helper.read(batch_id)
+            if getattr(helper,'_batch_owner','')!=_visitor_owner(x_vigilens_display_session):raise ValueError('Batch belongs to another owner')
             if batch['source_digest']!=source or batch['result_sha256']!=digest(job['result']):raise ValueError('Batch belongs to another source/result')
             return await helper.run(batch_id)
         except LiveTransportDisabled:raise HTTPException(503,'SAM PPE execution disabled; no claim or call created')
@@ -180,13 +190,42 @@ def create_router(service,display):
                 covering_ids={c['person_id']for c in r['face_coverings']}
                 region_ids={c['person_id']for c in r['regions']}
                 if not covering_ids<=ids or covering_ids&region_ids or not ids<=covering_ids|region_ids:raise ValueError('Every assessed person needs a separate treatment or shield coverage review')
-            out=await display.create(image,review,x_vigilens_display_session)
+            dispositions=r.pop('proposal_dispositions',None)
+            coverage_summary=None
+            if dispositions is not None:
+                # Optional detector-proposal disposition validation (offline,
+                # fail-closed): recompute the detector pass for THIS exact source
+                # and require one explicit disposition per returned proposal.
+                # This covers ONLY what the detector returned - detector misses
+                # stay possible, coverage stays unverified, release stays off.
+                # Absent field keeps the established manual-review flow unchanged.
+                path=getattr(SERVICE,'face_proposal_model_path',None)
+                if path is None:raise ValueError('Proposal disposition validation requires the configured offline detector')
+                raw=await image.read(15_000_001);await image.seek(0)
+                from .face_proposals import propose_faces
+                from .coverage_validation import DISPOSITION_SUCCESS_REASONS, validate_dispositions
+                outcome=propose_faces(raw,image.content_type,path)
+                # Fail-closed: a detector pass that did not complete (missing or
+                # wrong-pinned model, missing runtime, detector failure) returns
+                # zero proposals with a failure reason. That is never a valid
+                # base for accepting dispositions - no session may be created.
+                if outcome.get('reason') not in DISPOSITION_SUCCESS_REASONS:
+                    raise ValueError('Detector proposal pass did not complete; refusing disposition validation, no session created')
+                coverage_summary=validate_dispositions(dispositions,outcome['proposals'],r.get('regions',[]),r.get('face_coverings'))
+                coverage_summary['detector_ran']=True
+                coverage_summary['detector_outcome_reason']=outcome['reason']
+                coverage_summary['scope']='detector_proposal_dispositions_only_not_whole_frame_coverage'
+            # display.create re-parses the raw review form, so hand it the
+            # sanitized payload (proposal_dispositions popped above), not the
+            # original string.
+            out=await display.create(image,json.dumps(r),x_vigilens_display_session)
             with display.LOCK:
                 current=source_result(source,_visitor_owner(x_vigilens_display_session))
                 if digest(current['result'])!=digest(job['result']):
                     display.SESSIONS.pop(out['session_id'],None);raise ValueError('Result changed during preview preparation')
                 session=display.SESSIONS[out['session_id']]
                 session.meta['fresh_assessment_binding']={'source':source,'result_sha256':digest(job['result'])}
+                if coverage_summary is not None:session.meta['proposal_coverage']=coverage_summary
                 _sess_owner=_visitor_owner(x_vigilens_display_session)
                 session.verify=lambda meta,_o=_sess_owner:metadata_check(meta,_o)
                 if not session.meta.get('display_pixels_unchanged'):SERVICE.register_derivative(session.png,source)
@@ -212,7 +251,9 @@ def create_router(service,display):
         with display.LOCK:
             display.prune()
             for sid,s in list(display.SESSIONS.items()):
-                if s.owner==owner and s.meta.get('fresh_assessment_binding')=={'source':source,'result_sha256':digest(job['result'])}:
+                # Preparation alone never suffices: the session must carry the exact
+                # derivative acknowledgment (strict typed equality at /review).
+                if s.owner==owner and s.reviewed and s.meta.get('fresh_assessment_binding')=={'source':source,'result_sha256':digest(job['result'])}:
                     display.lookup(sid,owner)
                     return
         raise ValueError('Current exact source-bound browser preview required')
@@ -277,7 +318,7 @@ def create_router(service,display):
             job=source_result(source,_visitor_owner(x_vigilens_display_session))
             with display.LOCK:
                 display.prune()
-                if not any(s.owner==x_vigilens_display_session and s.meta.get('fresh_assessment_binding')=={'source':source,'result_sha256':digest(job['result'])}for s in display.SESSIONS.values()):raise ValueError('Exact source-bound browser preview required')
+                if not any(s.owner==x_vigilens_display_session and s.reviewed and s.meta.get('fresh_assessment_binding')=={'source':source,'result_sha256':digest(job['result'])}for s in display.SESSIONS.values()):raise ValueError('Exact acknowledged source-bound browser preview required')
             people=job['result']['persons'];image=job['result']['image']
             if set(payload)!={'person_id','point','exact_source_confirmed','boots_ground_visible','reviewer_label'}:raise ValueError('Exact manual contact claim required')
             if any(type(payload[k])is not bool for k in ('exact_source_confirmed','boots_ground_visible'))or not all(payload[k]for k in ('exact_source_confirmed','boots_ground_visible')):raise ValueError('Explicit operator confirmations required')
@@ -307,7 +348,7 @@ def create_router(service,display):
             try:
                 metadata_check(session.meta,_visitor_owner(x_vigilens_display_session));binding=session.meta['fresh_assessment_binding'];job=source_result(binding['source'],_visitor_owner(x_vigilens_display_session))
                 snapshot=ZoneStore(SERVICE).latest(binding['source'],binding['result_sha256'],x_vigilens_display_session)
-                png,sha=render_overlay(session.png,job['result'],snapshot['zones']if snapshot else[],session.meta['regions'],current_ppe_masks(binding['source'],binding['result_sha256'],_visitor_owner(x_vigilens_display_session)))
+                png,sha=_overlay_or_withheld(session.meta,render_overlay,session.png,job['result'],snapshot['zones']if snapshot else[],session.meta['regions'],current_ppe_masks(binding['source'],binding['result_sha256'],_visitor_owner(x_vigilens_display_session)))
                 SERVICE.register_derivative(png,binding['source'])
                 return Response(png,media_type='image/png',headers={'Cache-Control':'no-store','Content-Disposition':'inline',
                     'X-Vigilens-Overlay-SHA256':sha,'X-Vigilens-Export-Allowed':'false',
@@ -336,7 +377,7 @@ def create_router(service,display):
                     connection=SERVICE.connect()
                     try:
                         table=connection.execute("SELECT 1 FROM sqlite_master WHERE name='ppe_mask_batches'").fetchone()
-                        ids=[r[0]for r in connection.execute('SELECT id FROM ppe_mask_batches WHERE source=? AND result_sha=?',(binding['source'],binding['result_sha256']))]if table else[]
+                        ids=[r[0]for r in connection.execute('SELECT id FROM ppe_mask_batches WHERE source=? AND result_sha=? AND owner=?',(binding['source'],binding['result_sha256'],_visitor_owner(x_vigilens_display_session)))]if table else[]
                     finally:connection.close()
                     out['ppe_segmentation']={'status':'separate_verified_masks_not_worn_or_absence_verdict','batches':[helper.read(i)for i in ids]}
                 from .ppe_consistency import review_signals
@@ -347,7 +388,7 @@ def create_router(service,display):
                     connection=SERVICE.connect()
                     try:
                         table=connection.execute("SELECT 1 FROM sqlite_master WHERE name='recheck_attempts'").fetchone()
-                        ids=[r[0]for r in connection.execute('SELECT attempt_id FROM recheck_attempts WHERE source=? AND result_sha=? ORDER BY ordinal',(binding['source'],binding['result_sha256']))]if table else[]
+                        ids=[r[0]for r in connection.execute('SELECT attempt_id FROM recheck_attempts WHERE source=? AND result_sha=? AND owner=? ORDER BY ordinal',(binding['source'],binding['result_sha256'],_visitor_owner(x_vigilens_display_session)))]if table else[]
                     finally:connection.close()
                     # Separate candidate observations only. Original report-visible
                     # PPE and geometry are never silently replaced by a recheck.
@@ -360,12 +401,12 @@ def create_router(service,display):
                     connection=SERVICE.connect()
                     try:
                         table=connection.execute("SELECT 1 FROM sqlite_master WHERE name='explanation_attempts'").fetchone()
-                        ids=[r[0]for r in connection.execute('SELECT id FROM explanation_attempts WHERE source=? AND context_sha=?',(binding['source'],plan['context_sha256']))]if table else[]
+                        ids=[r[0]for r in connection.execute('SELECT id FROM explanation_attempts WHERE source=? AND context_sha=? AND owner=?',(binding['source'],plan['context_sha256'],_visitor_owner(x_vigilens_display_session)))]if table else[]
                     finally:connection.close()
                     from .spatial_explanation import commentary_review
                     attempts=[executor.read(i)for i in ids]
                     for attempt in attempts:attempt['content_review']=commentary_review(attempt,ppe_masks=current_ppe_masks(binding['source'],binding['result_sha256'],_visitor_owner(x_vigilens_display_session)))
-                    out['spatial_explanations']={'status':'model_commentary_requires_human_review','attempts':attempts,'deterministic_fields_unchanged':True,
+                    out['spatial_explanations']={'status':'model_commentary_requires_human_review','attempts':attempts,'deterministic_fields_unchanged':True,'exact_plan_sha256':digest(plan),'reservation':'requires_exact_server_side_grant_for_this_plan_sha256','reservation_route':'/fresh-private-report/'+sid+'/explanation-reservation',
                         'input_basis_notice':'Missing auxiliary PPE masks means not supplied, not evidence that segmentation or PPE is absent. Commentary must be checked against the original pixels and reviewed geometry.'}
                 out['status']='needs_human_review' # No safety/release decisions.
                 return out
@@ -377,6 +418,21 @@ def create_router(service,display):
         raw=SERVICE.original_source_png(document['source_digest'])if getattr(SERVICE,'archive_verification_only',False)else SERVICE._read_artifact(SERVICE._art(owner,document['source_digest'],'source.png'))
         masks=current_ppe_masks(document['source_digest'],digest(job['result']),owner)
         return build_spatial_request(raw,job['result'],document['zone_review'],document['configured_rule_review'],masks)
+
+    @router.post('/fresh-private-report/{sid}/explanation-reservation')
+    async def reserve_explanation(sid:str,payload:dict,x_vigilens_display_session:str=Header('')):
+        # Reserve (not run) the exact current plan. Needs configured rules AND an exact
+        # server-side grant for this plan; no grant is created here and no provider call is made.
+        try:
+            owner=_visitor_owner(x_vigilens_display_session)
+            executor=getattr(SERVICE,'explanation_executor',None)
+            if executor is None:raise ValueError('No explicitly granted explanation configured')
+            with display.LOCK:
+                document=await report(sid,payload,x_vigilens_display_session)
+                job=source_result(document['source_digest'],owner);plan=explanation_plan(document,job,owner)
+                identity=executor.reserve(plan,owner)
+                return {'attempt_id':identity,'state':'reserved_not_dispatched','plan_sha256':digest(plan),'provider_calls_this_request':0,'grant_created_here':False}
+        except (ValueError,KeyError,TypeError,OSError,sqlite3.Error,AuditError):raise HTTPException(409,'Explanation reservation unavailable: configured rules and an exact server-side grant for this plan are required; nothing reserved or called')
 
     @router.post('/fresh-private-report/{sid}/explanation/{attempt_id}')
     async def explain(sid:str,attempt_id:str,payload:dict,x_vigilens_display_session:str=Header('')):
@@ -406,7 +462,7 @@ def create_router(service,display):
             try:
                 binding=session.meta['fresh_assessment_binding'];job=source_result(binding['source'],_visitor_owner(x_vigilens_display_session))
                 zones=ZoneStore(SERVICE).latest(binding['source'],binding['result_sha256'],x_vigilens_display_session)
-                png,_=render_overlay(session.png,job['result'],zones['zones']if zones else[],session.meta['regions'],current_ppe_masks(binding['source'],binding['result_sha256'],_visitor_owner(x_vigilens_display_session)))
+                png,_=_overlay_or_withheld(session.meta,render_overlay,session.png,job['result'],zones['zones']if zones else[],session.meta['regions'],current_ppe_masks(binding['source'],binding['result_sha256'],_visitor_owner(x_vigilens_display_session)))
                 SERVICE.register_derivative(png,binding['source'])
                 pdf,sha=render_private_pdf(document,png)
                 return Response(pdf,media_type='application/pdf',headers={'Cache-Control':'no-store','Content-Disposition':'inline; filename="vigilens-private-preview.pdf"','X-Vigilens-Export-Allowed':'false','X-Vigilens-PDF-SHA256':sha})
@@ -446,7 +502,7 @@ def create_router(service,display):
                     session=display.lookup(review['session_id'],x_vigilens_display_session)
                     binding=session.meta['fresh_assessment_binding'];job=source_result(binding['source'],_visitor_owner(x_vigilens_display_session))
                     zone=ZoneStore(SERVICE).latest(binding['source'],binding['result_sha256'],x_vigilens_display_session)
-                    png,_=render_overlay(session.png,job['result'],zone['zones']if zone else[],session.meta['regions'],current_ppe_masks(binding['source'],binding['result_sha256'],_visitor_owner(x_vigilens_display_session)))
+                    png,_=_overlay_or_withheld(session.meta,render_overlay,session.png,job['result'],zone['zones']if zone else[],session.meta['regions'],current_ppe_masks(binding['source'],binding['result_sha256'],_visitor_owner(x_vigilens_display_session)))
                     if decode_image(png,'image/png').digest!=binding['source']:SERVICE.register_derivative(png,binding['source'])
                     sample=frame['sample']
                     label='Sample '+str(sample['sample_index'])+' | requested offset '+str(sample['requested_offset_seconds'])+'s. Sampled evidence only, not complete clip coverage or tracking.'
@@ -479,7 +535,7 @@ def create_router(service,display):
     async def frontend_audit_governed(image:UploadFile=File(...),zones:str=Form('[]'),x_vigilens_display_session:str=Header(''),x_vigilens_visitor_key:str=Header('')):
         # NEW-IMAGE contract. Dispatch is NOT decided here: this handler calls the same governed SERVICE.run as /fresh-review-upload, which
         # itself refuses without a source approval, a ledger reservation and a configured transport (LiveTransportDisabled -> 503, refusal -> 409).
-        # Being callable is not permission to dispatch. A stored result for the exact digest is served without a call. Posted zones are ignored.
+        # Being callable is not permission to dispatch. A stored result for the exact digest is served without a call. Posted zones are validated, then applied to stored masks as draft-matrix evaluations of unvalidated readings.
         try:
             from .frontend_audit import to_frontend_audit
             display.owner_check(x_vigilens_display_session)
@@ -512,7 +568,7 @@ def create_router(service,display):
             out=to_frontend_audit(job['result'],audit_id='fresh:'+frame.digest+':'+digest(job['result']),job_state=job['state'],source_digest=frame.digest,zones=vz)
             BOUND.add((x_vigilens_display_session,frame.digest))
             if ran:out['provider_calls_this_request']=None;out['provider_calls_note']='A governed run happened for this request; the call count is recorded only by the backend ledger, not by this view.'
-            out['zones_applied']=False;out['zones_semantics']='Posted zones are validated and echoed only. No zone membership was determined (no ground-contact review exists), so every person is unknown for every zone; zones_applied=false means no zone check happened.'
+            out['zones_semantics']=out['zones_applied_meaning']   # membership/matrix outcomes come from the stored result + posted zones; no provider call here
             return out
         except HTTPException:raise
         except LiveTransportDisabled:raise HTTPException(503,'Fresh provider execution disabled; no claim or call created')

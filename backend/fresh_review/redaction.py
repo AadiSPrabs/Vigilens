@@ -3,7 +3,7 @@ from PIL import Image,ImageDraw
 from core import decode_image,pixel_only_png
 import io,hashlib,math
 
-def probe(data,mime,*,source_digest,frame_size,regions,reviewer_label,face_coverings=None):
+def probe(data,mime,*,source_digest,frame_size,regions,reviewer_label,face_coverings=None,image_withheld=None):
  frame=decode_image(data,mime)
  if (frame.digest,(frame.width,frame.height))!=(source_digest,tuple(frame_size)):raise ValueError('Review belongs to a different source/frame')
  if not reviewer_label.strip() or len(reviewer_label)>80:raise ValueError('Local reviewer label required, not authenticated identity')
@@ -16,7 +16,20 @@ def probe(data,mime,*,source_digest,frame_size,regions,reviewer_label,face_cover
   if not isinstance(c['person_id'],str)or not c['person_id'].strip()or c['person_id']in ids:raise ValueError('Unique person coverage review required')
   ids.add(c['person_id'])
   if c['basis']!='opaque_worn_face_shield' or any(c[k]is not True for k in ('face_fully_hidden','no_visible_face_pixels','exact_source_confirmed')):raise ValueError('Explicit opaque shield review required, never detector absence')
- if not regions and not coverings:raise ValueError('Zero regions cannot establish no faces')
+ claim=None
+ if image_withheld is not None:
+  # Explicit operator election to withhold the image: a full-frame opaque
+  # redaction used as a privacy fallback when face-area masking cannot be
+  # established. It asserts NOTHING about faces - it is not a shield
+  # attestation, not a whole-frame-face claim, and never evidence that the
+  # image contains no faces. Coverage stays not_verified, privacy stays
+  # not_validated, export stays off, and genuine zero-face verification
+  # remains unproven. The original is never auto-allowed.
+  c=image_withheld
+  if not isinstance(c,dict)or set(c)!={'basis','exact_source_confirmed','withhold_entire_frame'}:raise ValueError('Exact image-withhold election required')
+  if c['basis']!='operator_elected_image_withheld' or any(c[k]is not True for k in ('exact_source_confirmed','withhold_entire_frame')):raise ValueError('Image-withhold election requires exact-source confirmation and explicit full-frame election')
+  claim=dict(c)
+ if not regions and not coverings and claim is None:raise ValueError('Zero regions cannot establish no faces')
  im=Image.open(io.BytesIO(pixel_only_png(data,mime))).convert('RGB');out=im.copy();draw=ImageDraw.Draw(out)
  ids=set()
  for region in regions:
@@ -26,6 +39,7 @@ def probe(data,mime,*,source_digest,frame_size,regions,reviewer_label,face_cover
   l,t,r,bottom=b
   if not 0<=l<r<=frame.width or not 0<=t<bottom<=frame.height:raise ValueError('Out of frame privacy region')
   draw.rectangle((l,t,r-1,bottom-1),fill='black')
+ if claim is not None:draw.rectangle((0,0,frame.width-1,frame.height-1),fill='black')
  # Pixels-only re-encode, never preserve source EXIF/name/embedded thumbnail.
  clean=Image.frombytes('RGB',out.size,out.tobytes());buf=io.BytesIO();clean.save(buf,'PNG');png=buf.getvalue()
- return png,{'source':'offline_manual_regions_real_image_probe','source_digest':frame.digest,'width':frame.width,'height':frame.height,'regions':regions,'face_coverings':coverings,'face_covering_basis':'operator_visual_claim_not_detector_or_privacy_validation','display_pixels_unchanged':not bool(regions),'reviewer_label':reviewer_label.strip(),'output_sha256':hashlib.sha256(png).hexdigest(),'coverage':'not_verified','privacy_review_status':'not_validated','evidence_export_allowed':False,'warning':'Manual opaque regions only, not a face detector or anonymity guarantee. Body, tattoos, clothes and location can identify people. Not model input or safe evidence.'}
+ return png,{'source':'offline_manual_regions_real_image_probe','source_digest':frame.digest,'width':frame.width,'height':frame.height,'regions':regions,'face_coverings':coverings,'face_covering_basis':'operator_visual_claim_not_detector_or_privacy_validation','image_withheld_basis':('operator_election_not_privacy_validation'if claim else None),'display_pixels_unchanged':not bool(regions)and claim is None,'image_withheld':claim,'reviewer_label':reviewer_label.strip(),'output_sha256':hashlib.sha256(png).hexdigest(),'coverage':'not_verified','privacy_review_status':'not_validated','evidence_export_allowed':False,'warning':'Manual opaque regions only, not a face detector or anonymity guarantee. Body, tattoos, clothes and location can identify people. Not model input or safe evidence.'}

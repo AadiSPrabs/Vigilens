@@ -121,7 +121,7 @@ class RecheckExecutor:
     async def run(self,aid):
         attempt=self.read(aid)
         if attempt['state']!='reserved_not_dispatched':return attempt
-        if self.service.transport is disabled_transport:raise LiveTransportDisabled('Recheck dispatch not enabled; no claim, state change or call created')
+        self.service.require_dispatch_ready('Recheck')
         grant=self.approval(attempt)
         c=self.service.connect()
         try:

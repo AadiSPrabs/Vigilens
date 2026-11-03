@@ -14,6 +14,7 @@ async def run_review_loop(service,source,*,attempt_ids,owner=''):
  # Preflight every exact attempt before first dispatch, never allocate grants here.
  for aid in attempt_ids:
   attempt=executor.read(aid);plan=attempt['plan']
+  if attempt.get('owner','')!=owner:raise ValueError('Attempt belongs to another owner')
   if plan['source_digest']!=source or plan['result_sha256']!=digest(job['result'])or plan['person_id']not in unknown or plan['person_id']in seen:raise ValueError('One exact attempt per original unknown person required')
   executor.approval(attempt);seen.add(plan['person_id']);planned.append(attempt)
  results=[]

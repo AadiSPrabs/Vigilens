@@ -169,13 +169,16 @@ def test_seamless_meta_upload_records_live_scope_and_live_origin(tmp_path):
     # live origin labelling from the recorded (fake) provider response ids
     assert body['readings_origin'] == 'live_provider'
     assert body['person_geometry_origin'] == 'provider_returned_unvalidated'
-    # zones validated and echoed, never applied
-    assert body['zones'] and body['zones'][0]['id'] == 'z1' and body['zones_applied'] is False
+    # zones validated and echoed; membership/matrix applied to the stored masks as draft evaluations (never compliance claims)
+    assert body['zones'] and body['zones'][0]['id'] == 'z1' and body['zones_applied'] is True
+    assert body['ruleset_version'] == 'draft-unapproved' and 'never compliance determinations' in body['zones_applied_meaning']
     # geometry usable: normalized polygons inside the unit square, 4-point boxes
     for person in body['persons']:
         assert len(person['polygon']) == 4
         assert all(0 <= q['x'] <= 1 and 0 <= q['y'] <= 1 for q in person['polygon'])
         assert all(f['kind'] == 'uncertainty' for f in person['findings'])
+        # readings unknown -> no violations; membership itself resolved from the stored mask, no provider call at view time
+        assert person['zone_membership_status'] == 'known' and person['ground_contact']['basis'] == 'mask_derived_estimate_unverified'
     # exact wire requests hit the provider endpoint with the bearer key
     assert [json.loads(q.data)['model'] for q in opener.requests][0] == 'sam-3.1'
     for q in opener.requests:
