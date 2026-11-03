@@ -1,7 +1,7 @@
 """Private integration preparation. Empty source approvals and disabled transport by default."""
 import json,os,sqlite3,time,hashlib
 from pathlib import Path
-from fastapi import APIRouter,UploadFile,File,Form,Header,HTTPException
+from fastapi import APIRouter,UploadFile,File,Form,Header,HTTPException,Depends
 from adapters import LiveTransportDisabled
 from core import AuditError,decode_image
 from .pipeline import FreshPipeline,digest
@@ -42,6 +42,21 @@ def create_router(service,display):
     SERVICE=service
     router=APIRouter()
     BOUND=set()   # (owner session, source digest): a session is bound to a source only by presenting that exact image (possession proof) to a frontend-audit POST. In memory, single local process; not an account system.
+    async def auxiliary_key_context(x_vigilens_visitor_key:str=Header('')):
+        # Same request-keyed transport and explicit live switch as governed upload.
+        # Reservations also preflight readiness so a missing key cannot create a hold.
+        from .transport import MetaRequestTransport,CURRENT_VISITOR_KEY
+        if not isinstance(getattr(SERVICE,'transport',None),MetaRequestTransport):
+            yield
+            return
+        if os.environ.get('VIGILENS_LIVE_DISPATCH','off')!='on':
+            raise HTTPException(503,'Auxiliary provider execution disabled; nothing reserved or called')
+        try:key=MetaRequestTransport.validate_key(x_vigilens_visitor_key)
+        except ValueError:raise HTTPException(503,'Visitor key required; nothing reserved or called')
+        token=CURRENT_VISITOR_KEY.set(key)
+        try:yield
+        finally:CURRENT_VISITOR_KEY.reset(token)
+
     def source_result(source,owner=''):
         if not isinstance(source,str)or len(source)!=64 or any(c not in '0123456789abcdef'for c in source):raise ValueError('Source identity required')
         job=SERVICE.read(source,owner)
@@ -125,7 +140,7 @@ def create_router(service,display):
             'original_result_unchanged':True,'candidate_adoption':'requires_separate_human_review'}
 
     @router.post('/fresh-review/{source}/recheck/{attempt_id}')
-    async def execute_recheck(source:str,attempt_id:str,payload:dict,x_vigilens_display_session:str=Header('')):
+    async def execute_recheck(source:str,attempt_id:str,payload:dict,x_vigilens_display_session:str=Header(''),_key_context=Depends(auxiliary_key_context)):
         try:
             job=source_result(source,_visitor_owner(x_vigilens_display_session));current_preview(source,job,x_vigilens_display_session)
             if set(payload)!={'source_digest','result_sha256'}or payload['source_digest']!=source or payload['result_sha256']!=digest(job['result']):raise ValueError('Exact original result required')
@@ -176,7 +191,7 @@ def create_router(service,display):
         except (ValueError,KeyError,TypeError,OSError,sqlite3.Error,AuditError):raise HTTPException(409,'Recheck plan unavailable for this source/person; nothing reserved or called')
 
     @router.post('/fresh-review/{source}/recheck-reservation')
-    async def recheck_reservation(source:str,payload:dict,x_vigilens_display_session:str=Header('')):
+    async def recheck_reservation(source:str,payload:dict,x_vigilens_display_session:str=Header(''),_key_context=Depends(auxiliary_key_context)):
         # Reserve (not run) one exact attempt. The exact pinned grant for THIS plan is checked BEFORE anything is booked;
         # without it nothing is reserved. No grant is created here and no provider call is made.
         try:
@@ -194,7 +209,7 @@ def create_router(service,display):
         except (ValueError,KeyError,TypeError,OSError,sqlite3.Error,AuditError):raise HTTPException(409,'Recheck reservation unavailable: an exact pinned grant for this plan is required; nothing reserved or called')
 
     @router.post('/fresh-review/{source}/bounded-review-loop')
-    async def bounded_review_loop(source:str,payload:dict,x_vigilens_display_session:str=Header('')):
+    async def bounded_review_loop(source:str,payload:dict,x_vigilens_display_session:str=Header(''),_key_context=Depends(auxiliary_key_context)):
         from .agent_loop import run_review_loop
         try:
             job=source_result(source,_visitor_owner(x_vigilens_display_session));current_preview(source,job,x_vigilens_display_session)
@@ -207,7 +222,7 @@ def create_router(service,display):
         except (ValueError,KeyError,TypeError,OSError,sqlite3.Error,AuditError):raise HTTPException(409,'Configured exact recheck loop unavailable; no new grant/reservation or retry')
 
     @router.post('/fresh-review/{source}/ppe-segmentation/{batch_id}')
-    async def ppe_segmentation(source:str,batch_id:str,payload:dict,x_vigilens_display_session:str=Header('')):
+    async def ppe_segmentation(source:str,batch_id:str,payload:dict,x_vigilens_display_session:str=Header(''),_key_context=Depends(auxiliary_key_context)):
         try:
             job=source_result(source,_visitor_owner(x_vigilens_display_session));current_preview(source,job,x_vigilens_display_session)
             if set(payload)!={'source_digest','result_sha256'}or payload['source_digest']!=source or payload['result_sha256']!=digest(job['result']):raise ValueError('Exact original result required')
@@ -519,7 +534,7 @@ def create_router(service,display):
         return build_spatial_request(raw,job['result'],document['zone_review'],document['configured_rule_review'],masks)
 
     @router.post('/fresh-private-report/{sid}/explanation-reservation')
-    async def reserve_explanation(sid:str,payload:dict,x_vigilens_display_session:str=Header('')):
+    async def reserve_explanation(sid:str,payload:dict,x_vigilens_display_session:str=Header(''),_key_context=Depends(auxiliary_key_context)):
         # Reserve (not run) the exact current plan. Needs configured rules AND an exact
         # server-side grant for this plan; no grant is created here and no provider call is made.
         try:
@@ -534,7 +549,7 @@ def create_router(service,display):
         except (ValueError,KeyError,TypeError,OSError,sqlite3.Error,AuditError):raise HTTPException(409,'Explanation reservation unavailable: configured rules and an exact server-side grant for this plan are required; nothing reserved or called')
 
     @router.post('/fresh-private-report/{sid}/explanation/{attempt_id}')
-    async def explain(sid:str,attempt_id:str,payload:dict,x_vigilens_display_session:str=Header('')):
+    async def explain(sid:str,attempt_id:str,payload:dict,x_vigilens_display_session:str=Header(''),_key_context=Depends(auxiliary_key_context)):
         try:
             _visitor_owner(x_vigilens_display_session)
             executor=getattr(SERVICE,'explanation_executor',None)
