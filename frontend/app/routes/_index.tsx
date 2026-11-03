@@ -12,6 +12,7 @@ import { Inspector } from "@/vigilens/components/Inspector";
 import { PrintReport } from "@/vigilens/components/PrintReport";
 import { BannerStack } from "@/vigilens/components/BannerStack";
 import { ApiKeyPanel } from "@/vigilens/components/ApiKeyPanel";
+import { ReopenPanel } from "@/vigilens/components/ReopenPanel";
 import { TopBar } from "@/vigilens/components/TopBar";
 import { SAMPLES, ZoneEditor, type Draft } from "@/vigilens/components/ZoneEditor";
 import { SAMPLE_PRESET_ZONES, type SampleId } from "@/vigilens/fixtures/audits";
@@ -78,8 +79,11 @@ export default function VigilensRoute() {
   const zonesEdited = sampleId !== null && !sampleZonesEqual(zones, sampleId);
   const sampleBlocked = sampleId !== null && !sampleZonesEqual(effectiveZones, sampleId);
   const backendGated = source?.kind === "upload" && backendConfigured() && !backendReady;
-  const analyseDisabled = !source || status === "loading" || sampleBlocked || backendGated;
-  const analyseBlockedReason = sampleBlocked
+  const storedSource = source?.kind === "stored";
+  const analyseDisabled = !source || status === "loading" || sampleBlocked || backendGated || storedSource;
+  const analyseBlockedReason = storedSource
+    ? "This is a reopened stored result. It is never re-analysed here; choose a photo or a sample to start a new audit."
+    : sampleBlocked
     ? runWithoutZones
       ? "Fixture results need the sample's preset zones. Untick Run without zones to continue."
       : "Fixture results need the sample's preset zones. Reset to sample zones to continue."
@@ -123,7 +127,7 @@ export default function VigilensRoute() {
   };
 
   const previewFile = source?.kind === "upload" ? source.file : null;
-  const previewRequired = !!audit && audit.source === "backend" && !!audit.image.pixel_digest && !!audit.rechecks && previewFile !== null;
+  const previewRequired = !!audit && audit.source === "backend" && !!audit.image.pixel_digest && !!audit.rechecks && (previewFile !== null || storedSource);
   const previewReady = !!previewSession && !!audit?.image.pixel_digest && previewSession.source_digest === audit.image.pixel_digest;
 
   const startDraft = () => setDraft({ points: [], name: "", hazard: false, error: null });
@@ -182,6 +186,7 @@ export default function VigilensRoute() {
         />
         <BannerStack audit={audit} />
         <ApiKeyPanel />
+        <ReopenPanel onReopen={async (d) => { setDraft(null); setPreviewSession(null); await vg.reopen(d); }} disabled={status === "loading"} />
 
         <div className="grid flex-1 grid-cols-1 items-start gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_380px]">
           <div className="flex min-w-0 flex-col gap-4">
@@ -246,10 +251,11 @@ export default function VigilensRoute() {
               onCancel={vg.cancel}
               onRetry={vg.analyse}
             />
-            {previewRequired && previewFile && audit ? (
+            {previewRequired && audit ? (
               <PreviewCeremony
                 audit={audit}
                 file={previewFile}
+                key={source?.kind === "stored" ? source.digest : "upload"}
                 onAcknowledged={(session) => {
                   setPreviewSession(session);
                   announce("Preview acknowledged. Any available recheck will use this treated copy only.");

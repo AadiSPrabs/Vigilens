@@ -310,16 +310,17 @@ async function readRefusal(response: Response, fallback: string): Promise<never>
 
 export async function preparePrivateDisplay(
   source: string,
-  image: File,
+  image: File | null,
   review: Record<string, unknown>,
 ): Promise<PrivateDisplaySession> {
   const formData = new FormData();
-  formData.append("image", image);
+  // image === null means "reopen": the backend reads this account's own stored source.
+  if (image) formData.append("image", image);
   formData.append("review", JSON.stringify(review));
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort("timeout"), TIMEOUT_MS);
   try {
-    const response = await fetch(`/api/vigilens/fresh-review/${source}/private-display`, {
+    const response = await fetch(`/api/vigilens/fresh-review/${source}/private-display${image ? "" : "/reopen"}`, {
       method: "POST",
       body: formData,
       signal: controller.signal,
@@ -363,13 +364,13 @@ function isFaceProposalsResult(value: unknown): value is FaceProposalsResult {
 // whole-frame pass - the result never marks regions, never ticks a checkbox,
 // and a 409 (detector unconfigured/unavailable) just means: do the manual
 // review. No automatic retry.
-export async function fetchFaceProposals(source: string, image: File): Promise<FaceProposalsResult> {
+export async function fetchFaceProposals(source: string, image: File | null): Promise<FaceProposalsResult> {
   const formData = new FormData();
-  formData.append("image", image);
+  if (image) formData.append("image", image);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort("timeout"), TIMEOUT_MS);
   try {
-    const response = await fetch(`/api/vigilens/fresh-review/${source}/face-proposals`, {
+    const response = await fetch(`/api/vigilens/fresh-review/${source}/face-proposals${image ? "" : "/reopen"}`, {
       method: "POST",
       body: formData,
       signal: controller.signal,
@@ -771,6 +772,39 @@ export async function reserveExplanation(
     });
     if (!response.ok) return readRefusal(response, "Explanation reservation unavailable; nothing reserved or called");
     return (await response.json()) as ExplanationReservation;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+const HEX64_SOURCE = /^[0-9a-f]{64}$/;
+
+// Reopen the caller's OWN stored job by its exact source digest. Stored-only: the
+// backend never dispatches, reserves or lists; a miss (unknown digest, other
+// account, missing preserved source) is a 409 and nothing is reopened.
+export async function reopenStoredAudit(source: string, zones: unknown[] = []): Promise<Audit> {
+  const digest = source.trim().toLowerCase();
+  if (!HEX64_SOURCE.test(digest)) throw new BackendError("Enter the full 64-character source digest of a job you ran earlier.");
+  const formData = new FormData();
+  formData.append("zones", JSON.stringify(zones));
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort("timeout"), TIMEOUT_MS);
+  try {
+    const response = await fetch(`/api/vigilens/fresh-review/${digest}/reopen-audit`, { method: "POST", body: formData, signal: controller.signal });
+    if (response.status === 403) return readRefusal(response, "Private browser session required");
+    if (response.status === 409) throw new BackendError("No stored job with that digest is available to this account. Nothing was reopened and nothing was analysed. No automatic retry.");
+    if (!response.ok) return readRefusal(response, "Reopen refused");
+    const audit = (await response.json()) as Audit;
+    if (!audit || audit.image?.pixel_digest !== digest) throw new BackendError("The server returned a result for a different source. Refusing to use it. No automatic retry.");
+    audit.fixture_loaded_at = audit.fixture_loaded_at ?? null;
+    audit.fixture_notice = audit.fixture_notice ?? null;
+    audit.rechecks = audit.rechecks ?? { status: "not_configured", attempts: [], original_result_unchanged: true };
+    for (const person of audit.persons) for (const finding of person.findings) finding.recheck_trace = finding.recheck_trace ?? [];
+    return audit;
+  } catch (err) {
+    if (err instanceof BackendError) throw err;
+    if ((err as DOMException)?.name === "AbortError" || err === "timeout") throw new BackendError("Reopen timed out. No automatic retry.");
+    throw new BackendError("Could not reach the backend. No automatic retry.");
   } finally {
     clearTimeout(timeoutId);
   }

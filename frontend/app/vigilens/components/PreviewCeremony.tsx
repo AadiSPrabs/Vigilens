@@ -66,7 +66,8 @@ export function polygonBox(polygon: { x: number; y: number }[], width: number, h
 
 export function PreviewCeremony(props: {
   audit: Audit;
-  file: File;
+  // null = reopened stored job: the backend reads this account's own preserved source.
+  file: File | null;
   onAcknowledged: (session: PrivateDisplaySession) => void;
   onInvalidate: () => void;
 }) {
@@ -132,7 +133,7 @@ export function PreviewCeremony(props: {
   // masking is the default starting point, not an optional extra. Failures only
   // surface the aid error; the manual whole-frame review stays the requirement.
   const autoRanFor = useRef<string | null>(null);
-  const sourceKey = `${digest ?? ""}:${file.name}:${file.size}`;
+  const sourceKey = `${digest ?? ""}:${file ? `${file.name}:${file.size}` : "stored"}`;
   useEffect(() => {
     if (!digest) return;
     if (autoRanFor.current === sourceKey) return;

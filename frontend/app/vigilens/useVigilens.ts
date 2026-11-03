@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
 
 import { analyzeImage, FIXTURE_UPLOAD_MESSAGE } from "./api/auditClient";
+import { reopenStoredAudit } from "./api/backendClient";
+import { validateAudit } from "./validate";
 import { SAMPLE_PRESET_ZONES, type SampleId } from "./fixtures/audits";
 import { formatClock } from "./format";
 import { MAX_ZONES } from "./geometry";
@@ -10,7 +12,10 @@ export const UPLOAD_ZONES_KEY = "vigilens-upload-zones";
 
 export type Source =
   | { kind: "sample"; sampleId: SampleId; imageUrl: string }
-  | { kind: "upload"; imageUrl: string; name: string; file: File };
+  | { kind: "upload"; imageUrl: string; name: string; file: File }
+  // A job reopened from this account's own stored result by exact digest. There is no
+  // browser-held photo: pixels only ever come from a prepared, acknowledged derivative.
+  | { kind: "stored"; imageUrl: null; name: string; digest: string };
 
 export type Filters = { severity: string; zone: string };
 
@@ -30,6 +35,7 @@ export type State = {
 
 type Action =
   | { type: "source"; source: Source; zones: Zone[] }
+  | { type: "reopened"; source: Source; audit: Audit; loadedAt: string }
   | { type: "zones"; zones: Zone[] }
   | { type: "runWithoutZones"; value: boolean }
   | { type: "start"; runId: number }
@@ -72,6 +78,8 @@ export function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "source":
       return { ...cleared(state), source: action.source, zones: action.zones, runWithoutZones: false };
+    case "reopened":
+      return { ...cleared(state), source: action.source, zones: [], runWithoutZones: true, status: "success", audit: action.audit, loadedAt: action.loadedAt, error: null };
     case "zones": {
       const added = action.zones.length > state.zones.length;
       return { ...cleared(state), zones: action.zones, runWithoutZones: added ? false : state.runWithoutZones };
@@ -156,6 +164,21 @@ export function useVigilens(announce: (text: string) => void) {
     });
   }, []);
 
+  const reopen = useCallback(
+    async (digest: string) => {
+      controllerRef.current?.abort();
+      if (uploadUrlRef.current) {
+        URL.revokeObjectURL(uploadUrlRef.current);
+        uploadUrlRef.current = null;
+      }
+      const clean = digest.trim().toLowerCase();
+      const audit = validateAudit(await reopenStoredAudit(clean, []));
+      dispatch({ type: "reopened", source: { kind: "stored", imageUrl: null, name: `Stored job ${clean.slice(0, 12)}`, digest: clean }, audit, loadedAt: formatClock(new Date()) });
+      announce("Stored job reopened. Nothing was analysed. Prepare and acknowledge a treated preview before any private report, zones or rules.");
+    },
+    [announce],
+  );
+
   const setZones = useCallback(
     (zones: Zone[]) => {
       if (state.source?.kind === "upload") saveUploadZones(zones);
@@ -206,6 +229,7 @@ export function useVigilens(announce: (text: string) => void) {
     state,
     chooseSample,
     chooseUpload,
+    reopen,
     setZones,
     setRunWithoutZones,
     analyse,
