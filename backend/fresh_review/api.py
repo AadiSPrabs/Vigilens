@@ -191,6 +191,15 @@ def create_router(service,display):
             out=self._raw[self._pos:]if n is None or n<0 else self._raw[self._pos:self._pos+n];self._pos+=len(out);return out
         async def seek(self,pos):self._pos=pos
 
+    def _stored_source(source,owner):
+        # Caller's OWN preserved canonical PNG for a verified job; fail closed on any mismatch.
+        try:
+            job=source_result(source,owner)
+            raw=SERVICE._read_artifact(SERVICE._art(owner,source,'source.png'))
+            if decode_image(raw,'image/png').digest!=source:raise ValueError('Preserved source changed')
+            return job,raw
+        except (ValueError,KeyError,TypeError,OSError,sqlite3.Error,AuditError):raise HTTPException(409,'Stored source unavailable for this account; nothing reopened')
+
     @router.post('/fresh-review/{source}/private-display/reopen')
     async def reopen_display(source:str,review:str=Form(...),x_vigilens_display_session:str=Header('')):
         # Owner-bound reopen of an existing verified job: the pixels come from this
@@ -199,12 +208,7 @@ def create_router(service,display):
         # the SAME preparation/acknowledgment path as an upload. No listing, no
         # download, no export, no provider call; a fresh /review acknowledgment is
         # still required (nothing carries over from an earlier session).
-        try:
-            owner=_visitor_owner(x_vigilens_display_session)
-            job=source_result(source,owner)
-            raw=SERVICE._read_artifact(SERVICE._art(owner,source,'source.png'))
-            if decode_image(raw,'image/png').digest!=source:raise ValueError('Preserved source changed')
-        except (ValueError,KeyError,TypeError,OSError,sqlite3.Error,AuditError):raise HTTPException(409,'Stored source unavailable for this account; nothing reopened')
+        owner=_visitor_owner(x_vigilens_display_session);job,raw=_stored_source(source,owner)
         return await _prepare_display(source,_StoredSource(raw),review,x_vigilens_display_session)
 
     async def _prepare_display(source,image,review,x_vigilens_display_session):
@@ -557,6 +561,41 @@ def create_router(service,display):
             response.headers['Content-Disposition']='attachment; filename="vigilens-private-sampled-clip-preview.pdf"'
             response.headers['X-Vigilens-Use-Restriction']='private-operator-preview-not-certified-safe-to-share'
             return response
+
+    @router.post('/fresh-review/{source}/reopen-audit')
+    async def reopen_audit(source:str,zones:str=Form('[]'),x_vigilens_display_session:str=Header('')):
+        # STORED-ONLY view of the caller's own verified job in the same shape as the governed audit.
+        # Never dispatches, never reserves, never creates a job; a miss is 409. No image bytes are returned.
+        from .frontend_audit import to_frontend_audit
+        display.owner_check(x_vigilens_display_session)
+        owner=_visitor_owner(x_vigilens_display_session)
+        try:
+            from core import validate_zones;vz=validate_zones(zones)
+            job,_raw=_stored_source(source,owner)
+            if job.get('state')not in('completed','partial_completed','archived_verified')or not job.get('result'):raise ValueError('Terminal result required')
+            display.reject_display_input(source)
+            out=to_frontend_audit(job['result'],audit_id='fresh:'+source+':'+digest(job['result']),job_state=job['state'],source_digest=source,zones=vz)
+            BOUND.add((x_vigilens_display_session,source))
+            out['zones_semantics']=out['zones_applied_meaning'];out['provider_calls_this_request']=0;out['reopened_from_stored']=True
+            return out
+        except HTTPException:raise
+        except AuditError:raise
+        except (ValueError,KeyError,TypeError,OSError,sqlite3.Error):raise HTTPException(409,'Stored audit unavailable for this account; nothing reopened')
+
+    @router.post('/fresh-review/{source}/face-proposals/reopen')
+    async def face_proposals_reopen(source:str,x_vigilens_display_session:str=Header('')):
+        # Same detector aid as /face-proposals, over the caller's own preserved source (no upload).
+        display.owner_check(x_vigilens_display_session)
+        job,raw=_stored_source(source,_visitor_owner(x_vigilens_display_session))
+        try:
+            from .face_proposals import propose_faces
+            path=getattr(SERVICE,'face_proposal_model_path',None)
+            if path is None:raise ValueError('Optional local detector not configured')
+            out=propose_faces(raw,'image/png',path)
+            out['result_sha256']=digest(job['result']);out['automatic_treatment_applied']=False;out['provider_calls_this_request']=0
+            out['mandatory_next_step']='operator_edit_and_whole_frame_coverage_review_before_private_display'
+            return out
+        except (ValueError,KeyError,TypeError,OSError,sqlite3.Error):raise HTTPException(409,'Face proposals unavailable for this stored source')
 
     @router.post('/fresh-review-audit-governed')
     async def frontend_audit_governed(image:UploadFile=File(...),zones:str=Form('[]'),x_vigilens_display_session:str=Header(''),x_vigilens_visitor_key:str=Header('')):
