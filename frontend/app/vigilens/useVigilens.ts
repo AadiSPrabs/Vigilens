@@ -82,9 +82,12 @@ export function reducer(state: State, action: Action): State {
       return { ...cleared(state), source: action.source, zones: [], runWithoutZones: true, status: "success", audit: action.audit, loadedAt: action.loadedAt, error: null };
     case "zones": {
       const added = action.zones.length > state.zones.length;
+      // A reopened stored job is never re-analysed, so drawing or saving zones must not drop its stored audit.
+      if (state.source?.kind === "stored") return { ...state, zones: action.zones };
       return { ...cleared(state), zones: action.zones, runWithoutZones: added ? false : state.runWithoutZones };
     }
     case "runWithoutZones":
+      if (state.source?.kind === "stored") return state;
       return { ...cleared(state), runWithoutZones: action.value };
     case "start":
       return { ...state, runId: action.runId, status: "loading", error: null, audit: null };
