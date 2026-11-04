@@ -145,7 +145,7 @@ describe("backendClient", () => {
 
   it("checkBackendReady pings the same-origin proxy health route", async () => {
     const mod = await importClient({});
-    const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ status: "ok" }), { status: 200, headers: { "content-type": "application/json" } }));
     vi.stubGlobal("fetch", fetchMock);
     await expect(mod.checkBackendReady()).resolves.toBe(true);
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/vigilens/health");
@@ -153,6 +153,18 @@ describe("backendClient", () => {
     const mod2 = await importClient({});
     await expect(mod2.checkBackendReady()).resolves.toBe(false);
   });
+  it.each([
+    ["<html>Application loading</html>", "text/html", 200],
+    ["{}", "application/json", 200],
+    ['{"status":"starting"}', "application/json", 200],
+    ['{"status":"ok"}', "application/json", 429],
+    ["not JSON", "application/json", 200],
+  ])("does not treat HTML, malformed health or refusal as backend readiness", async (body, contentType, status) => {
+    const mod = await importClient({});
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(body, { status, headers: { "content-type": contentType } })));
+    await expect(mod.checkBackendReady()).resolves.toBe(false);
+  });
+
 });
 
 describe("auditClient routing", () => {

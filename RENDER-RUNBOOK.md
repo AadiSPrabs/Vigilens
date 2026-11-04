@@ -59,8 +59,21 @@ rather than serving stale state.
   visitor re-uploads the EXACT same image bytes, the claim finds the stored
   completed job and returns it with ZERO redispatch and ZERO new charge, and
   the visitor re-acknowledges the preview to continue.
-- Free services sleep after 15 min idle (~1 min cold start). The frontend
-  polls `/health` and keeps analysis disabled until the backend answers.
+- Free services sleep after 15 min idle (~1 min cold start).
+- Startup wake (hosted behavior still requires verification): when the frontend
+  server process starts, its Nitro startup plugin sends one server-side GET
+  to the configured `VIGILENS_BACKEND_URL` + `/health`, before a visitor needs
+  to sign in. It attaches no access token or visitor API key, follows no
+  redirects, times out after 75 seconds and does not block frontend startup.
+  This requests backend wake-up; it is not proof the backend is ready.
+- There is no keep-alive loop or automatic analysis retry in that startup
+  action. It cannot fix suspension, missing configuration or an upstream 429.
+  A backend that sleeps while the frontend process stays running still relies
+  on the dashboard's existing health checks, not another process-start event.
+- The signed-in dashboard checks the proxied `/health` and keeps upload
+  analysis disabled until it receives JSON with `status: "ok"`. HTTP 200 HTML
+  loading pages are not readiness. The existing readiness loop is separate
+  from the one-shot startup request.
 
 ## Hostnames and wiring to verify at deploy (do not presume defaults)
 
