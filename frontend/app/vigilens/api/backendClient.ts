@@ -29,7 +29,9 @@ export function backendConfigured(): boolean {
 export async function checkBackendReady(): Promise<boolean> {
   try {
     const res = await fetch(HEALTH_ENDPOINT, { cache: "no-store" });
-    return res.ok;
+    if (!res.ok || !res.headers.get("content-type")?.includes("application/json")) return false;
+    const health = await res.json();
+    return health?.status === "ok";
   } catch {
     return false;
   }
