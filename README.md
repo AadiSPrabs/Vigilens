@@ -18,7 +18,7 @@ The idea behind it: try prompt-based PPE review through the Meta Model API inste
 3. **PPE observation (Muse Spark 1.3).** Each person crop is sent for a strict, schema-limited helmet/vest observation. The result is recorded as an unvalidated model observation.
 4. **Human review.** The operator confirms or rejects what is shown. Ground-contact and zone membership checks use the operator's reviewed geometry. Re-checks of a person run only under an exact, separately granted plan, and camera-scene reuse needs operator confirmation each time.
 5. **Operator-entered rules and optional explanation.** The operator enters their own rules (nothing is prefilled). An optional Muse Spark explanation of the exact reviewed plan can be reserved (a reservation makes no model call). Running one needs an exact server-side grant that this app does not create. Explanation text is unvalidated commentary, never a rule or a safety decision.
-6. **Private report.** The report is a reviewer-prepared private preview. Faces the detector finds are masked in the report only; the live review view is unmasked. Masking can miss faces and is human-reviewed redaction, not verified anonymity. If a face cannot be checked, the operator can withhold the image from the report. Download and export are gated off by default.
+6. **Private report.** The report is a reviewer-prepared private preview. Offline face detection proposes regions for human review. The operator reviews and applies report-only masking; the live upload review is unmasked. A stored reopen deliberately displays a treated copy, not the unmasked live source. Masking can miss faces and is human-reviewed redaction, not verified anonymity. If a face cannot be checked, the operator can withhold the image from the report. Download and export are gated off by default.
 
 Severity and rule evaluation are deterministic and operator-configured. They are not model judgement.
 
@@ -31,12 +31,17 @@ The tests and sample data in this repository use a synthetic transport and make 
 
 ## Status (read this)
 
-- Verified locally on synthetic data: frontend 157/157 vitest (happy-dom) and a clean `tsc --noEmit`; the backend suites for the report, explanation, redaction and rule paths pass (383 tests in the last run). A full backend run of 946/946 was recorded on an older baseline, not repeated on this exact tree.
-- Browser flows (login, upload, face proposals, masked and withheld PDFs, zone save, camera-template reuse, bounded review loop) were checked in a real browser on **synthetic** data against an **earlier** build. The newest rule-entry and explanation screens have **not** been checked in a browser.
-- A clean **production build is not verified** (the build ran out of memory on a 2 GB machine).
-- Raw-upload omission from report traffic has not been verified end to end.
-- Accuracy on real footage has not been measured. Nothing here is a safety, privacy or compliance guarantee.
-- A hosted prototype tracks the separate branch `render-trial-candidate` (commit 85bc1118 when the demo was recorded) at https://vigilens-frontend.onrender.com/. This README update leaves that hosting branch unchanged. On that host, manual black-region masking, whole-frame acknowledgment and a private PDF preview were run in a browser on 3 November 2026. Face proposals were unavailable there (the request returned 409), so the masking shown was manual. The report showed rules, explanations and re-checks as not configured, and export stayed off. The host's backend build version was not verified.
+- Local synthetic qualification on the current code: 977 non-Postgres backend tests passed in two disjoint file batches, 45 separate Postgres tests, and 222 frontend tests across 43 files. These are separate runs, not one aggregate suite. A focused current-code run on 4 November passed 79 camera, clip, recheck, loop and face-boot tests. No provider calls are made by these tests.
+- The focused clip tests include bounded local FFmpeg/ffprobe decoding of a generated MP4, sampled-frame identity and limits. Camera reuse is bound to an explicitly confirmed fixed scene and does not transfer contact decisions or rules. Synthetic recheck/loop tests cover exact grants, immutable original results, owner isolation and no automatic retry after uncertainty.
+- Earlier synthetic browser checks covered upload, masking/withholding, camera reuse and a bounded review loop. Current hosted checks on 3-4 November covered stored reopen, offline face-proposal requests, manual region masking, whole-frame review, contact review, operator-entered test rules and a private two-page PDF. Those hosted checks used a generated image, not real-site footage.
+- On 4 November, one exact, previously reserved Muse Spark explanation completed on the hosted prototype. Both people retained deterministic position-unknown/manual-contact-review results. Its two commentary rows are unvalidated and did not change the deterministic findings. This does not qualify live recheck execution: no eligible unknown-PPE recheck candidate was available in that review.
+- The hosted prototype is https://vigilens-frontend.onrender.com/ on the separate `render-trial-candidate` branch. The operator confirmed both Render services Live at code commit `7acee41` before the latest hosted checks. Backend flag/grant cleanup is separately operator-controlled; this README is not proof of current dispatch configuration. The main and submission branches must be reconciled before final submission.
+- One supplied public-domain NIOSH photo also completed SAM and two person-PPE calls on 4 November. The browser stopped waiting at 60 seconds; an account-bound stored-result read recovered the completed result without another model call. These remain unvalidated observations, not accuracy measurements.
+- Private PDF labels now distinguish report-display values from preserved unvalidated provider readings. Missing evidence-review/visibility support can withhold a report-display value without changing the provider reading. No provider readings are printed when the image is withheld. This labeling fix is local, not yet deployed.
+- The local candidate adds exact-upload, account-bound read-only status recovery and explicit pending UI with no automatic paid retry. It also extends the bounded image request wait to cover sequential calls. This recovery fix is not yet deployed. Explanation reservation uncertainty is checked through the existing gated report without creating a second reservation.
+- Local production build was not verified after a 2 GB out-of-memory failure. Render Live confirmation is separate deployment evidence, not a clean local production-build result.
+- Raw-upload omission from report traffic has not been verified end to end. Face proposals and manual masking are not verified anonymity or all-face coverage. Download and evidence export remain gated off; a private preview is not released evidence.
+- The current local candidate also fixes missing request-key binding on the clip upload route. Five regressions and a six-path local HTTP proxy test pass; this fix has not been deployed or verified on the host. Real-footage accuracy, current hosted short-clip execution and current hosted camera reuse have not been qualified. Nothing here is a safety, privacy or compliance guarantee.
 
 ## Repository layout
 
@@ -50,13 +55,13 @@ Older notes inside `backend/` (for example `RUNNING.md`, `STATUS.md`) predate la
 
 ## What was built during the hackathon
 
-The concept was first written down on 26 October 2026. The frontend dashboard (upload, zone drawing, results UI) began on 27 October with teammate commits visible in this repository's history. The backend and the later review, report, rule and explanation work were developed from 27 October through 3 November with AI-agent assistance (Instinct and Muse) and are added here as a source package. Dates for the backend come from working records; the repository history alone does not show them because the backend was added in a single commit on 1 November.
+The concept was first written down on 26 October 2026. The frontend dashboard (upload, zone drawing, results UI) began on 27 October with teammate commits visible in this repository's history. The backend and the later review, report, rule and explanation work were developed from 27 October through 4 November with AI-agent assistance (Instinct and Muse) and are added here as a source package. Dates for the backend come from working records; the repository history alone does not show them because the backend was added in a single commit on 1 November.
 
 ## Hackathon
 
 - Event: [Meta Global AI Developer Hackathon](https://cerebralvalley.ai/e/meta-ai-developer-hackathon) (Cerebral Valley x Meta)
 - Track: Indie Developer
-- Demo: a narrated recorded walkthrough (about 3 minutes) of the hosted prototype on generated images, with manual masking shown, prepared for submission through the Cerebral Valley portal.
+- Demo: a three-minute narrated walkthrough is being revised for submission through the Cerebral Valley portal. The completed hosted recording uses generated imagery; the real-photo revision and final video edit are not yet complete.
 
 ## Data and licences
 

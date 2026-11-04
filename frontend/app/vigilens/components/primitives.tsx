@@ -95,14 +95,14 @@ export function EmptyState({ title, children, art }: { title?: string; children:
   );
 }
 
-export function ErrorPanel({ message, onRetry }: { message: string; onRetry: () => void }) {
+export function ErrorPanel({ message, onRetry, pending }: { message: string; onRetry: () => void; pending?: boolean }) {
   return (
     <div role="alert" className="flex flex-col gap-3 rounded-vg-md border border-sev-critical-border bg-sev-critical-bg p-4">
-      <h2 className="text-base font-semibold text-sev-critical-fg">Analysis did not finish</h2>
+      <h2 className="text-base font-semibold text-sev-critical-fg">{pending ? "Analysis status unknown" : "Analysis did not finish"}</h2>
       <p className="text-sm text-sev-critical-fg">{message}</p>
       <div>
         <Button type="button" variant="outline" className="min-h-10" onClick={onRetry}>
-          Try again
+          {pending ? "Check stored status (no analysis)" : "Try again"}
         </Button>
       </div>
     </div>

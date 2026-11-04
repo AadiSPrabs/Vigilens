@@ -9,9 +9,14 @@ import type { Audit, ClipSummary, FaceProposalsResult, PrivateDisplaySession, Re
 const BACKEND_ENDPOINT = "/api/vigilens/fresh-review-audit-governed";
 const HEALTH_ENDPOINT = "/api/vigilens/health";
 const TIMEOUT_MS = 60000;
+const EXECUTION_TIMEOUT_MS = 320000;
 
 export class BackendError extends Error {
   noRetry = true;
+}
+
+export class PendingAuditError extends BackendError {
+  pending = true;
 }
 
 export function backendConfigured(): boolean {
@@ -49,7 +54,7 @@ export async function analyzeWithBackend(
   formData.append("zones", JSON.stringify(zones.map(stripZone)));
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort("timeout"), TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort("timeout"), EXECUTION_TIMEOUT_MS);
   if (signal) {
     signal.addEventListener("abort", () => controller.abort(signal.reason));
   }
@@ -75,7 +80,7 @@ export async function analyzeWithBackend(
         const errJson = await response.json();
         const code = errJson?.detail?.code;
         if (code === "ATTEMPT_UNCERTAIN") {
-          throw new BackendError(
+          throw new PendingAuditError(
             "A provider attempt for this exact image was started and did not finish. It is held and never retried automatically; only the backend ledger reconciles it.",
           );
         }
@@ -105,6 +110,7 @@ export async function analyzeWithBackend(
       }
       throw new BackendError(`The backend refused this image (${response.status}). No automatic retry.`);
     }
+    if (response.status >= 500 && response.status !== 503) throw new PendingAuditError("Status unknown; the audit may still be running. Check stored status only. Do not run analysis again.");
     if (!response.ok) {
       throw new BackendError(`Backend error: ${response.status}`);
     }
@@ -133,12 +139,24 @@ export async function analyzeWithBackend(
   } catch (err) {
     if (err instanceof BackendError) throw err;
     if ((err as DOMException)?.name === "AbortError" || err === "timeout") {
-      throw new Error("No response yet; the audit may still be running.");
+      throw new PendingAuditError("Status unknown; the audit may still be running. Check stored status only. Do not run analysis again.");
     }
-    throw err;
+    throw new PendingAuditError("Connection lost; analysis status is unknown. Check stored status only. Do not run analysis again.");
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+export async function recoverUploadedAudit(file: File, zones: Zone[]): Promise<Audit> {
+  const body = new FormData(); body.append("image", file); body.append("zones", JSON.stringify(zones.map(stripZone)));
+  const res = await fetch("/api/vigilens/fresh-review-job-status", { method: "POST", body, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  if (!res.ok) throw new PendingAuditError("Stored status unavailable. No analysis was retried; check again later.");
+  const out = await res.json();
+  if (out.status !== "completed" || !out.audit) throw new PendingAuditError("No completed result visible yet. No analysis was retried; the hold remains pending reconciliation.");
+  const audit = out.audit as Audit; audit.fixture_loaded_at ??= null; audit.fixture_notice ??= null;
+  audit.rechecks ??= { status: "not_configured", attempts: [], original_result_unchanged: true };
+  for (const p of audit.persons) for (const f of p.findings) f.recheck_trace ??= [];
+  return audit;
 }
 
 // ---- Visitor BYOK (bring-your-own Meta key) -------------------------------
@@ -703,14 +721,18 @@ export async function executeExplanation(
     persons,
   };
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort("timeout"), TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort("timeout"), 110000);
   try {
     const response = await fetch(
       `/api/vigilens/private-report/${encodeURIComponent(session.session_id)}/explanation/${encodeURIComponent(attemptId)}`,
       { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload), signal: controller.signal },
     );
-    if (!response.ok) return readRefusal(response, "Explanation unavailable or not configured; no claim or call created");
+    if (response.status >= 500 && response.status !== 503) throw new Error("No definite execution response");
+    if (!response.ok) return readRefusal(response, "Explanation refused; no automatic retry");
     return (await response.json()) as ExplanationResult;
+  } catch (err) {
+    if (err instanceof BackendError) throw err;
+    throw new BackendError("Explanation execution status unknown. Check existing report only; do not run again.");
   } finally {
     clearTimeout(timeoutId);
   }
@@ -801,8 +823,12 @@ export async function reserveExplanation(
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
-    if (!response.ok) return readRefusal(response, "Explanation reservation unavailable; nothing reserved or called");
+    if (response.status >= 500 && response.status !== 503) throw new Error("No definite reservation response");
+    if (!response.ok) return readRefusal(response, "Explanation reservation refused; no automatic retry");
     return (await response.json()) as ExplanationReservation;
+  } catch (err) {
+    if (err instanceof BackendError) throw err;
+    throw new BackendError("Explanation reservation status unknown. Check the existing report; do not reserve again. " + (err instanceof Error ? err.message : ""));
   } finally {
     clearTimeout(timeoutId);
   }

@@ -64,4 +64,20 @@ describe("explanation reservation", () => {
     expect(mocks.explain).not.toHaveBeenCalled();
     expect(mocks.report).toHaveBeenCalledTimes(1);
   });
+  it("reconciles a timed-out reservation through report only, never reserves twice",async()=>{
+    mocks.report.mockResolvedValueOnce(READY).mockResolvedValueOnce(RESERVED);
+    mocks.reserve.mockRejectedValue(new Error("Explanation reservation status unknown. Check existing report; do not reserve again."));
+    const el=await mount();await act(async()=>btn(el,"Reserve this exact explanation")!.click());
+    expect(mocks.reserve).toHaveBeenCalledTimes(1);expect(mocks.explain).not.toHaveBeenCalled();
+    expect(mocks.report).toHaveBeenCalledTimes(2);expect(btn(el,"Run this exact explanation attempt")?.disabled).toBe(false);
+  });
+  it("blocks a second reservation while the report still has no attempt",async()=>{
+    mocks.report.mockResolvedValue(READY);
+    mocks.reserve.mockRejectedValue(new Error("Explanation reservation status unknown. Do not reserve again."));
+    const el=await mount();await act(async()=>btn(el,"Reserve this exact explanation")!.click());
+    expect(btn(el,"Reserve this exact explanation")?.disabled).toBe(true);
+    await act(async()=>btn(el,"Check existing report")!.click());
+    expect(mocks.reserve).toHaveBeenCalledTimes(1);expect(mocks.explain).not.toHaveBeenCalled();
+  });
+
 });

@@ -14,6 +14,7 @@ type Props = {
   zones: Zone[];
   status: "idle" | "loading" | "error" | "success";
   error: string | null;
+  pendingAudit?: boolean;
   loadedAt: string | null;
   reviews: Record<string, ReviewDecision>;
   onReview: (findingId: string, value: ReviewDecision) => void;
@@ -67,7 +68,7 @@ export function Inspector(props: Props) {
             <Button type="button" variant="outline" className="min-h-10" onClick={props.onCancel}>Cancel</Button>
           </div>
         ) : null}
-        {status === "error" && error ? <ErrorPanel message={error} onRetry={props.onRetry} /> : null}
+        {status === "error" && error ? <ErrorPanel message={error} onRetry={props.onRetry} pending={props.pendingAudit === true} /> : null}
         {!audit && status !== "loading" && status !== "error" ? (
           <p className="text-sm text-vg-text-secondary">Analyse a photo to see findings, people and the hazard log.</p>
         ) : null}

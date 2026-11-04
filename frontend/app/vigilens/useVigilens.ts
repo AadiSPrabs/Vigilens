@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
 
 import { analyzeImage, FIXTURE_UPLOAD_MESSAGE } from "./api/auditClient";
-import { reopenStoredAudit } from "./api/backendClient";
+import { reopenStoredAudit, recoverUploadedAudit, PendingAuditError } from "./api/backendClient";
 import { validateAudit } from "./validate";
 import { SAMPLE_PRESET_ZONES, type SampleId } from "./fixtures/audits";
 import { formatClock } from "./format";
@@ -27,6 +27,7 @@ export type State = {
   status: "idle" | "loading" | "error" | "success";
   audit: Audit | null;
   error: string | null;
+  pendingAudit: boolean;
   loadedAt: string | null;
   reviews: Record<string, ReviewDecision>;
   selectedPersonId: string | null;
@@ -40,7 +41,7 @@ type Action =
   | { type: "runWithoutZones"; value: boolean }
   | { type: "start"; runId: number }
   | { type: "success"; runId: number; audit: Audit; loadedAt: string }
-  | { type: "fail"; runId: number; message: string }
+  | { type: "fail"; runId: number; message: string; pending?: boolean }
   | { type: "cancel" }
   | { type: "review"; findingId: string; value: ReviewDecision }
   | { type: "select"; personId: string | null }
@@ -54,6 +55,7 @@ export const initialState: State = {
   status: "idle",
   audit: null,
   error: null,
+  pendingAudit: false,
   loadedAt: null,
   reviews: {},
   selectedPersonId: null,
@@ -77,26 +79,29 @@ function cleared(state: State): State {
 export function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "source":
-      return { ...cleared(state), source: action.source, zones: action.zones, runWithoutZones: false };
+      return { ...cleared(state), source: action.source, zones: action.zones, runWithoutZones: false, pendingAudit: false };
     case "reopened":
-      return { ...cleared(state), source: action.source, zones: [], runWithoutZones: true, status: "success", audit: action.audit, loadedAt: action.loadedAt, error: null };
+      return { ...cleared(state), source: action.source, zones: [], runWithoutZones: true, status: "success", audit: action.audit, loadedAt: action.loadedAt, error: null, pendingAudit: false };
     case "zones": {
+      if (state.pendingAudit) return state;
       const added = action.zones.length > state.zones.length;
       // A reopened stored job is never re-analysed, so drawing or saving zones must not drop its stored audit.
       if (state.source?.kind === "stored") return { ...state, zones: action.zones };
       return { ...cleared(state), zones: action.zones, runWithoutZones: added ? false : state.runWithoutZones };
     }
     case "runWithoutZones":
+      if (state.pendingAudit) return state;
       if (state.source?.kind === "stored") return state;
       return { ...cleared(state), runWithoutZones: action.value };
     case "start":
+      if (state.pendingAudit) return state;
       return { ...state, runId: action.runId, status: "loading", error: null, audit: null };
     case "success":
       if (action.runId !== state.runId) return state;
-      return { ...state, status: "success", audit: action.audit, loadedAt: action.loadedAt, error: null };
+      return { ...state, status: "success", audit: action.audit, loadedAt: action.loadedAt, error: null, pendingAudit: false };
     case "fail":
       if (action.runId !== state.runId) return state;
-      return { ...state, status: "error", error: action.message, audit: null };
+      return { ...state, status: "error", error: action.message, audit: null, pendingAudit: action.pending === true };
     case "cancel":
       return { ...state, status: "idle" };
     case "review":
@@ -195,13 +200,15 @@ export function useVigilens(announce: (text: string) => void) {
   const cancel = useCallback(() => {
     controllerRef.current?.abort();
     controllerRef.current = null;
-    dispatch({ type: "cancel" });
-    announce("Analysis cancelled.");
-  }, [announce]);
+    if (state.source?.kind === "upload" && state.status === "loading") {
+      dispatch({ type: "fail", runId: state.runId, pending: true, message: "Stopped waiting; backend status is unknown. Check stored status only. No analysis was cancelled or retried." });
+      announce("Stopped waiting; check stored status before any new analysis.");
+    } else { dispatch({ type: "cancel" }); announce("Analysis cancelled."); }
+  }, [announce, state]);
 
   const analyse = useCallback(() => {
     const { source, zones, runWithoutZones } = state;
-    if (!source) return;
+    if (!source || state.pendingAudit) return;
     controllerRef.current?.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
@@ -223,9 +230,20 @@ export function useVigilens(announce: (text: string) => void) {
         if (controller.signal.aborted) return;
         controllerRef.current = null;
         const message = err instanceof Error && err.message ? err.message : FIXTURE_UPLOAD_MESSAGE;
-        dispatch({ type: "fail", runId, message });
-        announce(`Analysis failed. ${message}`);
+        dispatch({ type: "fail", runId, message, pending: err instanceof PendingAuditError });
+        announce(`${err instanceof PendingAuditError ? "Analysis status unknown" : "Analysis failed"}. ${message}`);
       });
+  }, [state, announce]);
+
+  const recover = useCallback(async () => {
+    if (!state.pendingAudit || state.source?.kind !== "upload") return;
+    try {
+      const audit = validateAudit(await recoverUploadedAudit(state.source.file, state.runWithoutZones ? [] : state.zones));
+      dispatch({ type: "success", runId: state.runId, audit, loadedAt: formatClock(new Date()) });
+      announce("Stored result recovered. No analysis was retried.");
+    } catch (err) {
+      dispatch({ type: "fail", runId: state.runId, message: err instanceof Error ? err.message : "Stored status unavailable", pending: true });
+    }
   }, [state, announce]);
 
   return {
@@ -236,6 +254,7 @@ export function useVigilens(announce: (text: string) => void) {
     setZones,
     setRunWithoutZones,
     analyse,
+    recover,
     cancel,
     dispatch,
   };

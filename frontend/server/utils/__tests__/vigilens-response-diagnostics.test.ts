@@ -26,13 +26,13 @@ describe("secret-free read-flow diagnostics", () => {
     const run = vi.fn(async (): Promise<Response> => { throw err; });
     await expect(diagnosticResponse("health", run)).rejects.toBe(err);
     expect(run).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(log.mock.calls[0][0])).toEqual({ event: "vigilens.proxy_diagnostic", route: "health", phase: "no_upstream_response", status: statusCode });
+    expect(JSON.parse(log.mock.calls[0]![0])).toEqual({ event: "vigilens.proxy_diagnostic", route: "health", phase: "no_upstream_response", status: statusCode });
   });
   it("keeps unknown exceptions out of logs and uses a bounded numeric status", async () => {
     const log = vi.spyOn(console, "info").mockImplementation(() => {});
     await expect(diagnosticResponse("health", async () => { throw { statusCode: "secret" }; })).rejects.toEqual({ statusCode: "secret" });
-    expect(JSON.parse(log.mock.calls[0][0]).status).toBe(500);
-    expect(log.mock.calls[0][0]).not.toContain("secret");
+    expect(JSON.parse(log.mock.calls[0]![0]).status).toBe(500);
+    expect(log.mock.calls[0]![0]).not.toContain("secret");
   });
   it.each(["9999999", "-1", "secret value", "https://private.invalid", "99999"])("drops unsafe Retry-After %s", value => {
     expect(diagnosticHeaders(new Response(null, { headers: { "retry-after": value } })).has("retry-after")).toBe(false);

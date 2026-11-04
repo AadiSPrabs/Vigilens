@@ -82,7 +82,7 @@ export default function VigilensRoute() {
   const sampleBlocked = sampleId !== null && !sampleZonesEqual(effectiveZones, sampleId);
   const backendGated = source?.kind === "upload" && backendConfigured() && !backendReady;
   const storedSource = source?.kind === "stored";
-  const analyseDisabled = !source || status === "loading" || sampleBlocked || backendGated || storedSource;
+  const analyseDisabled = vg.state.pendingAudit || !source || status === "loading" || sampleBlocked || backendGated || storedSource;
   const analyseBlockedReason = storedSource
     ? "This is a reopened stored result. It is never re-analysed here; choose a photo or a sample to start a new audit."
     : sampleBlocked
@@ -265,7 +265,8 @@ export default function VigilensRoute() {
               filters={filters}
               onFilters={(f) => dispatch({ type: "filters", filters: f })}
               onCancel={vg.cancel}
-              onRetry={vg.analyse}
+              pendingAudit={vg.state.pendingAudit}
+              onRetry={vg.state.pendingAudit ? vg.recover : vg.analyse}
             />
             {previewRequired && audit ? (
               <PreviewCeremony

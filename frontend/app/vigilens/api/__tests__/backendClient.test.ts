@@ -132,8 +132,8 @@ describe("backendClient", () => {
       })));
     const file = new File([new Uint8Array([1])], "p.png", { type: "image/png" });
     const pending = mod.analyzeWithBackend(file, []);
-    const assertion = expect(pending).rejects.toThrow("No response yet; the audit may still be running.");
-    await vi.advanceTimersByTimeAsync(61000);
+    const assertion = expect(pending).rejects.toThrow("Status unknown; the audit may still be running.");
+    await vi.advanceTimersByTimeAsync(321000);
     await assertion;
     vi.useRealTimers();
   });
@@ -499,4 +499,41 @@ describe("face-proposals review-aid client", () => {
     const file = new File([new Uint8Array([9])], "scene.png", { type: "image/png" });
     await expect(client.fetchFaceProposals(SOURCE, file)).rejects.toThrow(/Invalid response format/);
   });
+});
+
+describe("stored-only timeout recovery", () => {
+  it("looks up exact uploaded bytes without calling governed execution", async () => {
+    const mod = await importClient({});
+    const mock = vi.fn().mockResolvedValue(jsonResponse(200, {status:"completed",audit:governedAudit()}));vi.stubGlobal("fetch",mock);
+    const file = new File(["synthetic"],"x.png",{type:"image/png"});
+    const out=await mod.recoverUploadedAudit(file,[]);
+    expect(out.audit_id).toBe(governedAudit().audit_id);
+    expect(mock).toHaveBeenCalledTimes(1);expect(mock.mock.calls[0]?.[0]).toBe("/api/vigilens/fresh-review-job-status");
+    expect((mock.mock.calls[0]?.[1].body as FormData).get("image")).toBe(file);
+  });
+  it("keeps not-found/uncertain and failed status reads pending, never re-dispatches",async()=>{
+    const mod=await importClient({}); const f=new File(["x"],"x.png",{type:"image/png"});
+    for(const [status,body]of [[200,{status:"pending_or_uncertain"}],[200,{status:"not_found_or_not_visible"}],[409,{}]] as const){
+      const m=vi.fn().mockResolvedValue(jsonResponse(status,body));vi.stubGlobal("fetch",m);
+      await expect(mod.recoverUploadedAudit(f,[])).rejects.toBeInstanceOf(mod.PendingAuditError);
+      expect(m).toHaveBeenCalledTimes(1);expect(m.mock.calls[0]?.[0]).toContain("job-status");
+    }
+  });
+  it("504 and connection loss mean status unknown, never another paid POST",async()=>{
+    const mod=await importClient({});const f=new File(["x"],"x.png",{type:"image/png"});
+    for(const response of [Promise.resolve(jsonResponse(504,{})),Promise.reject(new Error("network"))]){
+      const m=vi.fn().mockReturnValue(response);vi.stubGlobal("fetch",m);
+      await expect(mod.analyzeWithBackend(f,[])).rejects.toBeInstanceOf(mod.PendingAuditError);expect(m).toHaveBeenCalledTimes(1);
+    }
+  });
+});
+
+describe("reservation uncertainty",()=>{
+ it("calls reserve only once and marks dropped/504 responses unknown",async()=>{
+  const mod=await importClient({});
+  const session={session_id:"session123",source_digest:"a".repeat(64),output_sha256:"b".repeat(64),regions_digest:"c".repeat(64)};
+  const fetchMock=vi.fn().mockResolvedValue(jsonResponse(504,{}));vi.stubGlobal("fetch",fetchMock);
+  await expect(mod.reserveExplanation(session as never,"assessment",{})).rejects.toThrow("status unknown");
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+ });
 });

@@ -153,13 +153,16 @@ export function PrivateReportPanel({ audit, session }: { audit: Audit; session: 
       const refreshed = await fetchPrivateReport(session, contract.assessment_id, reviews);
       if (!live(token, sessionId, sourceDigest)) return;
       setReport(refreshed);
+      if ((refreshed.spatial_explanations?.attempts ?? []).length) {
+        setExplainError(current => current?.startsWith("Explanation reservation status unknown") ? null : current);
+      }
     } catch {
       // The panel keeps its last shown state; nothing is retried automatically.
     }
   };
 
   const reservePlan = async () => {
-    if (busy || explainBusy || downloadBusy) return;
+    if (busy || explainBusy || downloadBusy || explainError?.includes("status unknown")) return;
     const token = ++generation.current;
     const sessionId = session.session_id;
     const sourceDigest = session.source_digest;
@@ -175,14 +178,15 @@ export function PrivateReportPanel({ audit, session }: { audit: Audit; session: 
       setReport(refreshed);
     } catch (err) {
       if (!live(token, sessionId, sourceDigest)) return;
-      setExplainError(err instanceof Error && err.message ? err.message : "Explanation reservation unavailable");
+      setExplainError(err instanceof Error && err.message ? err.message : "Explanation reservation status unknown; do not reserve again");
+      if (err instanceof Error && err.message.includes("status unknown")) await refreshReport();
     } finally {
       if (live(token, sessionId, sourceDigest)) setExplainBusy(null);
     }
   };
 
   const runExplanation = async (attemptId: string) => {
-    if (busy || explainBusy || downloadBusy) return;
+    if (busy || explainBusy || downloadBusy || explainError?.includes("status unknown")) return;
     const token = ++generation.current;
     const sessionId = session.session_id;
     const sourceDigest = session.source_digest;
@@ -198,7 +202,8 @@ export function PrivateReportPanel({ audit, session }: { audit: Audit; session: 
       setReport(refreshed);
     } catch (err) {
       if (!live(token, sessionId, sourceDigest)) return;
-      setExplainError(err instanceof Error && err.message ? err.message : "Explanation unavailable or not configured");
+      setExplainError(err instanceof Error && err.message ? err.message : "Explanation execution status unknown; do not run again");
+      if (err instanceof Error && err.message.includes("status unknown")) await refreshReport();
     } finally {
       if (live(token, sessionId, sourceDigest)) setExplainBusy(null);
     }
@@ -325,7 +330,7 @@ export function PrivateReportPanel({ audit, session }: { audit: Audit; session: 
                   <button
                     type="button"
                     className="mt-1 rounded border px-3 py-1 disabled:opacity-50"
-                    disabled={busy || explainBusy !== null}
+                    disabled={busy || explainBusy !== null || explainError?.includes("status unknown")}
                     onClick={() => void runExplanation(attemptId)}
                   >
                     {explainBusy === attemptId ? "Running explanation..." : "Run this exact explanation attempt"}
@@ -341,12 +346,12 @@ export function PrivateReportPanel({ audit, session }: { audit: Audit; session: 
                 <code className="break-all">{report.spatial_explanations.exact_plan_sha256}</code>). It runs only under an
                 exact server-side grant for that plan, which this page cannot create. Reserving makes no provider call.
               </p>
-              <button type="button" className="mt-1 rounded border px-3 py-1 disabled:opacity-50" disabled={busy || explainBusy !== null} onClick={() => void reservePlan()}>
+              <button type="button" className="mt-1 rounded border px-3 py-1 disabled:opacity-50" disabled={busy || explainBusy !== null || explainError?.includes("status unknown")} onClick={() => void reservePlan()}>
                 {explainBusy === "reserve" ? "Reserving..." : "Reserve this exact explanation (no call yet)"}
               </button>
             </div>
           ) : null}
-          {explainError ? <p className="mt-1 text-destructive">{explainError}</p> : null}
+          {explainError ? <><p className="mt-1 text-destructive">{explainError}</p><button type="button" disabled={busy || explainBusy !== null} onClick={() => void refreshReport()}>Check existing report (no reservation or model call)</button></> : null}
           {report.bounded_review_loop && resultShaFromAuditId(audit.audit_id) ? (
             <RecheckLoopPanel
               sourceDigest={session.source_digest}

@@ -31,6 +31,6 @@ def test_pdf_rechecks_pages_bounded_and_original_unchanged_wording():
  pages=render_private_pdf({**base_report(),'deliberate_rechecks':rechecks()},png(),_pages_only=True)
  assert 1<=len(pages)<=32
  # not_configured renders no section: identical output to a missing key
- a,_=render_private_pdf(base_report(),png())
- b,_=render_private_pdf({**base_report(),'deliberate_rechecks':{'status':'not_configured','attempts':[]}},png())
- assert a==b
+ a=render_private_pdf(base_report(),png(),_pages_only=True)
+ b=render_private_pdf({**base_report(),'deliberate_rechecks':{'status':'not_configured','attempts':[]}},png(),_pages_only=True)
+ assert len(a)==len(b) and all(x.tobytes()==y.tobytes() for x,y in zip(a,b))

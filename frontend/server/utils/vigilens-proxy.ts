@@ -257,7 +257,7 @@ export async function proxyToBackend(
       method: init.method,
       headers,
       body: (init.body ?? null) as BodyInit | null,
-      signal: AbortSignal.timeout(75_000), // above the client's 60s so the client aborts first
+      signal: AbortSignal.timeout(path === "/fresh-review-audit-governed" ? 330_000 : /\/explanation\/[0-9a-f]{64}$/.test(path) ? 120_000 : 75_000), // image: SAM + two sequential 90s PPE calls + overhead; reads stay bounded
       redirect: "error",
     });
   } catch {

@@ -19,7 +19,7 @@ describe("diagnostic route wiring via real local HTTP", () => {
     const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
     try {
       for (const [path, method] of [["/health", "GET"], ["/reopen/" + "a".repeat(64), "POST"]]) {
-        const out = await fetch(base + path, { method });
+        const out = await fetch(base + path, { method: method! });
         expect(out.status).toBe(429); expect(await out.text()).toBe("edge refusal");
         expect(out.headers.get("retry-after")).toBe("30"); expect(out.headers.get("rndr-id")).toBe("abcdef12-abcdef12");
         expect(out.headers.has("set-cookie")).toBe(false);

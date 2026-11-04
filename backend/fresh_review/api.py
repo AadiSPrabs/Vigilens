@@ -84,7 +84,7 @@ def create_router(service,display):
         except (ValueError,KeyError,TypeError,OSError,sqlite3.Error):raise HTTPException(409,'Fresh source/config/accounting unavailable or unapproved; no automatic retry')
 
     @router.post('/fresh-review-clip-upload')
-    async def clip_upload(clip:UploadFile=File(...),offsets:str=Form(...),x_vigilens_display_session:str=Header('')):
+    async def clip_upload(clip:UploadFile=File(...),offsets:str=Form(...),x_vigilens_display_session:str=Header(''),_key_context=Depends(auxiliary_key_context)):
         try:
             display.owner_check(x_vigilens_display_session)
             limits=getattr(SERVICE,'trusted_clip_limits',None)
@@ -679,6 +679,26 @@ def create_router(service,display):
             out['mandatory_next_step']='operator_edit_and_whole_frame_coverage_review_before_private_display'
             return out
         except (ValueError,KeyError,TypeError,OSError,sqlite3.Error):raise HTTPException(409,'Face proposals unavailable for this stored source')
+
+    @router.post('/fresh-review-job-status')
+    async def uploaded_job_status(image:UploadFile=File(...),zones:str=Form('[]'),x_vigilens_display_session:str=Header('')):
+        # Read-only recovery by exact source pixels and authenticated owner. Never
+        # calls prepare/run, mints approval, reserves, retries or returns source bytes.
+        try:
+            from .frontend_audit import to_frontend_audit
+            from core import validate_zones
+            owner=_visitor_owner(x_vigilens_display_session)
+            raw=await image.read(15_000_001);frame=decode_image(raw,image.content_type)
+            vz=validate_zones(zones);job=SERVICE.read(frame.digest,owner)
+            if not job:return {'status':'not_found_or_not_visible','source_digest':frame.digest,'provider_calls_this_request':0,'retry_allowed':False}
+            out={k:job[k]for k in ('state','known_listed_usd','reservation_usd','actual_debit','attempted_provider_calls_total','requires_operator_reconciliation')}
+            out.update(status='completed'if job['state']=='completed'else'pending_or_uncertain',source_digest=frame.digest,provider_calls_this_request=0,retry_allowed=False)
+            if job['state']=='completed':
+                out['audit']=to_frontend_audit(job['result'],audit_id='fresh:'+frame.digest+':'+digest(job['result']),job_state=job['state'],source_digest=frame.digest,zones=vz)
+            return out
+        except HTTPException:raise
+        except AuditError:raise
+        except (ValueError,KeyError,TypeError,OSError,sqlite3.Error):raise HTTPException(409,'Stored job status unavailable; no retry, reservation or provider call')
 
     @router.post('/fresh-review-audit-governed')
     async def frontend_audit_governed(image:UploadFile=File(...),zones:str=Form('[]'),x_vigilens_display_session:str=Header(''),x_vigilens_visitor_key:str=Header('')):

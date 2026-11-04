@@ -83,10 +83,16 @@ def render_private_pdf(report,overlay_png,*,_pages_only=False):
         e=_pd.get(str(pid))
         return e['text'] if e else 'Unmapped person (backend id '+str(pid)+')'
     for person in report['persons']:
-        if y+250>height-110:new_page()  # keep each person block on one page
+        if y+310>height-110:new_page()  # keep each person block on one page
         y+=16
         line(plabel(person['person_id']))
-        line('Protective hardhat worn: '+person['report_display_helmet']+' | Reflective vest worn: '+person['report_display_vest'])
+        line('Report-display hardhat: '+person['report_display_helmet']+' | Report-display vest: '+person['report_display_vest'])
+        if not report.get('image_withheld'):
+            line('Preserved provider readings (unvalidated): hardhat '+person.get('provider_helmet_observation','unknown')+' | vest '+person.get('provider_vest_observation','unknown'),small)
+        line('Report display uses evidence-review gates; unknown here does not overwrite a provider reading.',small)
+        ev=person.get('evidence_review',{});ve=person.get('vest_evidence_review',{})
+        if not ev.get('display_finding_allowed')or not ve.get('display_finding_allowed'):
+            line('Report evidence insufficient or withheld: exact source, whole-frame/face review, visibility and crop basis must support display.',small)
         line('Hardhat observation is separate from a welding face shield and site-specific requirements.',small)
         line('Evidence: '+person['status'].replace('_',' '),small)
         if person.get('ppe_assessed')is True and report.get('wide_scene'):line('Provider PPE observation attempted on a crop (unvalidated)',small)

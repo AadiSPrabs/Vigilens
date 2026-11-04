@@ -1,4 +1,4 @@
-"""Render trial entrypoint (SYNTHETIC transport only in this package).
+"""Render trial entrypoint (synthetic by default; opt-in visitor-key Meta transport).
 
 The other entrypoints bind 127.0.0.1 by deliberate design; this one binds
 0.0.0.0 because Render routes external HTTP to the service. It reuses the exact
@@ -59,10 +59,10 @@ def _private_write(path: Path, raw: bytes) -> None:
 
 
 def _wire_face_proposals(service):
-    # Optional offline face-check review aid: enabled only when the operator
-    # provisions the pinned YuNet model file and sets its absolute path. Unset
-    # means the proposals endpoint stays unavailable (409) and the operator's
-    # manual whole-frame review remains the requirement. The model sha256 pin
+    # Optional offline face-check review aid: use an explicit operator model path
+    # or the bundled pinned YuNet model. If neither is available, the proposals
+    # endpoint stays unavailable (409). Manual whole-frame review remains required.
+    # The model sha256 pin
     # lives in fresh_review/face_proposals.py; a mismatched file fails closed.
     # The aid never creates regions, never applies treatment, and never spends.
     face_model = os.environ.get('VIGILENS_FACE_MODEL_PATH', '').strip()
